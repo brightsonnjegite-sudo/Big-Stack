@@ -2,6 +2,7 @@
  * 🤖 MICKEY GLITCH - MAIN HANDLER WITH AUTO-REGISTRATION
  * Full-power message handler with dynamic command loading
  * Supports all commands, lib, data automatic registration
+ * Using absolute paths for reliable module loading
  */
 
 const fs = require('fs');
@@ -13,8 +14,19 @@ const chalk = require('chalk');
 // 🔧 INITIALIZATION & AUTO-SETUP
 // ═════════════════════════════════════════════════════════════════════════════
 
-// Auto-create muhimu folders
-const folders = ['./temp', './tmp', './data', './lib', './commands', './downloads', './downloads/statuses'];
+console.log(chalk.cyan(`\n📂 Working Directory: ${process.cwd()}\n`));
+
+// Auto-create muhimu folders (using absolute paths)
+const folders = [
+    path.join(process.cwd(), 'temp'),
+    path.join(process.cwd(), 'tmp'),
+    path.join(process.cwd(), 'data'),
+    path.join(process.cwd(), 'lib'),
+    path.join(process.cwd(), 'commands'),
+    path.join(process.cwd(), 'downloads'),
+    path.join(process.cwd(), 'downloads/statuses')
+];
+
 folders.forEach(dir => {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
@@ -37,78 +49,116 @@ global.commandStats = { total: 0, loaded: 0, failed: 0, lastUpdate: new Date() }
 // 📚 AUTO-LOAD LIBRARIES
 // ─────────────────────────────────────────────────────────────
 function loadLibraries() {
-    const libDir = './lib';
-    const libFiles = fs.readdirSync(libDir).filter(f => f.endsWith('.js') && !f.startsWith('Mickey'));
+    const libDir = path.join(process.cwd(), 'lib');
     
-    libFiles.forEach(file => {
-        try {
-            const libPath = path.join(libDir, file);
-            delete require.cache[require.resolve(libPath)];
-            const libModule = require(libPath);
-            global.libRegistry.set(file.replace('.js', ''), libModule);
-            console.log(chalk.green(`✅ Lib Loaded: ${file}`));
-        } catch (e) {
-            console.error(chalk.red(`❌ Lib Error [${file}]: ${e.message}`));
-            global.commandStats.failed++;
+    try {
+        if (!fs.existsSync(libDir)) {
+            console.warn(chalk.yellow(`⚠️  Lib directory not found: ${libDir}`));
+            return;
         }
-    });
-    console.log(chalk.cyan(`📚 Total Libs: ${global.libRegistry.size}`));
+        
+        const libFiles = fs.readdirSync(libDir).filter(f => f.endsWith('.js') && !f.startsWith('Mickey'));
+        
+        libFiles.forEach(file => {
+            try {
+                const libPath = path.join(libDir, file);
+                const libName = file.replace('.js', '');
+                
+                // Clear cache first
+                delete require.cache[libPath];
+                
+                // Require with absolute path
+                const libModule = require(libPath);
+                global.libRegistry.set(libName, libModule);
+                console.log(chalk.green(`✅ Lib Loaded: ${file}`));
+            } catch (e) {
+                console.error(chalk.red(`❌ Lib Error [${file}]: ${e.message}`));
+                global.commandStats.failed++;
+            }
+        });
+        console.log(chalk.cyan(`📚 Total Libs: ${global.libRegistry.size}`));
+    } catch (e) {
+        console.error(chalk.red(`❌ Error loading libs: ${e.message}`));
+    }
 }
 
 // ─────────────────────────────────────────────────────────────
 // 📋 AUTO-LOAD DATA FILES
 // ─────────────────────────────────────────────────────────────
 function loadDataRegistry() {
-    const dataDir = './data';
-    if (!fs.existsSync(dataDir)) return;
+    const dataDir = path.join(process.cwd(), 'data');
     
-    const dataFiles = fs.readdirSync(dataDir).filter(f => f.endsWith('.json'));
-    
-    dataFiles.forEach(file => {
-        try {
-            const dataPath = path.join(dataDir, file);
-            const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
-            global.dataRegistry.set(file.replace('.json', ''), { path: dataPath, data });
-            console.log(chalk.green(`✅ Data Loaded: ${file}`));
-        } catch (e) {
-            console.error(chalk.red(`❌ Data Error [${file}]: ${e.message}`));
+    try {
+        if (!fs.existsSync(dataDir)) {
+            console.warn(chalk.yellow(`⚠️  Data directory not found: ${dataDir}`));
+            return;
         }
-    });
-    console.log(chalk.cyan(`📋 Total Data Files: ${global.dataRegistry.size}`));
+        
+        const dataFiles = fs.readdirSync(dataDir).filter(f => f.endsWith('.json'));
+        
+        dataFiles.forEach(file => {
+            try {
+                const dataPath = path.join(dataDir, file);
+                const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+                global.dataRegistry.set(file.replace('.json', ''), { path: dataPath, data });
+                console.log(chalk.green(`✅ Data Loaded: ${file}`));
+            } catch (e) {
+                console.error(chalk.red(`❌ Data Error [${file}]: ${e.message}`));
+            }
+        });
+        console.log(chalk.cyan(`📋 Total Data Files: ${global.dataRegistry.size}`));
+    } catch (e) {
+        console.error(chalk.red(`❌ Error loading data: ${e.message}`));
+    }
 }
 
 // ─────────────────────────────────────────────────────────────
 // 🎮 AUTO-LOAD COMMANDS (DYNAMIC REGISTRY)
 // ─────────────────────────────────────────────────────────────
 function loadCommands() {
-    const cmdDir = './commands';
-    const cmdFiles = fs.readdirSync(cmdDir).filter(f => f.endsWith('.js') && !f.startsWith('Mickey'));
+    const cmdDir = path.join(process.cwd(), 'commands');
     
-    global.commandStats.total = cmdFiles.length;
-    
-    cmdFiles.forEach(file => {
-        try {
-            const cmdPath = path.join(cmdDir, file);
-            delete require.cache[require.resolve(cmdPath)];
-            const cmdModule = require(cmdPath);
-            const cmdName = file.replace('.js', '').toLowerCase();
-            
-            global.commandRegistry.set(cmdName, {
-                name: cmdName,
-                file: file,
-                module: cmdModule,
-                loadedAt: new Date().toISOString()
-            });
-            
-            console.log(chalk.green(`✅ Command Loaded: ${cmdName}`));
-            global.commandStats.loaded++;
-        } catch (e) {
-            console.error(chalk.red(`❌ Command Error [${file}]: ${e.message}`));
-            global.commandStats.failed++;
+    try {
+        if (!fs.existsSync(cmdDir)) {
+            console.warn(chalk.yellow(`⚠️  Commands directory not found: ${cmdDir}`));
+            return;
         }
-    });
-    
-    console.log(chalk.cyan(`🎮 Total Commands: ${global.commandRegistry.size} (${global.commandStats.failed} failed)`));
+        
+        const cmdFiles = fs.readdirSync(cmdDir).filter(f => f.endsWith('.js') && !f.startsWith('Mickey'));
+        
+        global.commandStats.total = cmdFiles.length;
+        
+        cmdFiles.forEach(file => {
+            try {
+                const cmdPath = path.join(cmdDir, file);
+                const cmdName = file.replace('.js', '').toLowerCase();
+                
+                // Clear from cache first
+                delete require.cache[cmdPath];
+                
+                // Require using absolute path
+                const cmdModule = require(cmdPath);
+                
+                global.commandRegistry.set(cmdName, {
+                    name: cmdName,
+                    file: file,
+                    module: cmdModule,
+                    loadedAt: new Date().toISOString()
+                });
+                
+                console.log(chalk.green(`✅ Command Loaded: ${cmdName}`));
+                global.commandStats.loaded++;
+            } catch (e) {
+                const shortError = e.message.split('\n')[0];
+                console.error(chalk.red(`❌ Command Error [${file}]: ${shortError}`));
+                global.commandStats.failed++;
+            }
+        });
+        
+        console.log(chalk.cyan(`🎮 Total Commands: ${global.commandRegistry.size} (${global.commandStats.failed} failed)`));
+    } catch (e) {
+        console.error(chalk.red(`❌ Error loading commands: ${e.message}`));
+    }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -125,47 +175,35 @@ let specialHandlers = {
 };
 
 function loadSpecialHandlers() {
-    try {
-        const handlers = require('./commands/autostatus');
-        specialHandlers.autostatus = handlers;
-        console.log(chalk.green('✅ AutoStatus Handler Ready'));
-    } catch (e) { console.error(chalk.red('❌ AutoStatus Error:'), e.message); }
+    const cmdDir = path.join(process.cwd(), 'commands');
     
-    try {
-        const handlers = require('./commands/chatbot');
-        specialHandlers.chatbot = handlers;
-        console.log(chalk.green('✅ Chatbot Handler Ready'));
-    } catch (e) { console.error(chalk.red('❌ Chatbot Error:'), e.message); }
+    const handlers = [
+        { name: 'autostatus', file: 'autostatus.js' },
+        { name: 'chatbot', file: 'chatbot.js' },
+        { name: 'statusforward', file: 'statusforward.js' },
+        { name: 'autoread', file: 'autoread.js' },
+        { name: 'antidelete', file: 'antidelete.js' },
+        { name: 'antilink', file: 'antilink.js' },
+        { name: 'antibadword', file: 'antibadword.js' }
+    ];
     
-    try {
-        const handlers = require('./commands/statusforward');
-        specialHandlers.statusforward = handlers;
-        console.log(chalk.green('✅ StatusForward Handler Ready'));
-    } catch (e) { console.error(chalk.red('❌ StatusForward Error:'), e.message); }
-    
-    try {
-        const handlers = require('./commands/autoread');
-        specialHandlers.autoread = handlers;
-        console.log(chalk.green('✅ AutoRead Handler Ready'));
-    } catch (e) { console.error(chalk.red('❌ AutoRead Error:'), e.message); }
-    
-    try {
-        const handlers = require('./commands/antidelete');
-        specialHandlers.antidelete = handlers;
-        console.log(chalk.green('✅ AntiDelete Handler Ready'));
-    } catch (e) { console.error(chalk.red('❌ AntiDelete Error:'), e.message); }
-    
-    try {
-        const handlers = require('./commands/antilink');
-        specialHandlers.antilink = handlers;
-        console.log(chalk.green('✅ AntiLink Handler Ready'));
-    } catch (e) { console.error(chalk.red('❌ AntiLink Error:'), e.message); }
-    
-    try {
-        const handlers = require('./commands/antibadword');
-        specialHandlers.antibadword = handlers;
-        console.log(chalk.green('✅ AntiBadword Handler Ready'));
-    } catch (e) { console.error(chalk.red('❌ AntiBadword Error:'), e.message); }
+    handlers.forEach(({ name, file }) => {
+        try {
+            const filePath = path.join(cmdDir, file);
+            if (!fs.existsSync(filePath)) {
+                console.warn(chalk.yellow(`⚠️  Handler file not found: ${file}`));
+                return;
+            }
+            
+            delete require.cache[filePath];
+            const handlers_module = require(filePath);
+            specialHandlers[name] = handlers_module;
+            console.log(chalk.green(`✅ ${name.charAt(0).toUpperCase() + name.slice(1)} Handler Ready`));
+        } catch (e) {
+            const shortError = e.message.split('\n')[0];
+            console.error(chalk.red(`❌ ${name} Error: ${shortError}`));
+        }
+    });
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -391,7 +429,11 @@ async function handleStatus(sock, messageUpdate) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 function setupFileWatcher() {
-    const watchDirs = ['./commands', './lib', './data'];
+    const watchDirs = [
+        path.join(process.cwd(), 'commands'),
+        path.join(process.cwd(), 'lib'),
+        path.join(process.cwd(), 'data')
+    ];
     const fileTimestamps = new Map();
     
     watchDirs.forEach(dir => {
@@ -427,7 +469,7 @@ function setupFileWatcher() {
                 if (dir.includes('commands') && filename.endsWith('.js')) {
                     const cmdName = filename.replace('.js', '').toLowerCase();
                     try {
-                        delete require.cache[require.resolve(filePath)];
+                        delete require.cache[filePath];
                         const cmdModule = require(filePath);
                         global.commandRegistry.set(cmdName, {
                             name: cmdName,
@@ -437,17 +479,19 @@ function setupFileWatcher() {
                         });
                         console.log(chalk.green(`✅ Command Reloaded: ${cmdName}`));
                     } catch (e) {
-                        console.error(chalk.red(`❌ Command Reload Error [${filename}]: ${e.message}`));
+                        const shortError = e.message.split('\n')[0];
+                        console.error(chalk.red(`❌ Command Reload Error [${filename}]: ${shortError}`));
                     }
                 } else if (dir.includes('lib') && filename.endsWith('.js')) {
                     try {
-                        delete require.cache[require.resolve(filePath)];
+                        delete require.cache[filePath];
                         const libModule = require(filePath);
                         const libName = filename.replace('.js', '');
                         global.libRegistry.set(libName, libModule);
                         console.log(chalk.green(`✅ Lib Reloaded: ${libName}`));
                     } catch (e) {
-                        console.error(chalk.red(`❌ Lib Reload Error [${filename}]: ${e.message}`));
+                        const shortError = e.message.split('\n')[0];
+                        console.error(chalk.red(`❌ Lib Reload Error [${filename}]: ${shortError}`));
                     }
                 } else if (dir.includes('data') && filename.endsWith('.json')) {
                     try {
@@ -456,7 +500,8 @@ function setupFileWatcher() {
                         global.dataRegistry.set(dataName, { path: filePath, data });
                         console.log(chalk.green(`✅ Data Reloaded: ${dataName}`));
                     } catch (e) {
-                        console.error(chalk.red(`❌ Data Reload Error [${filename}]: ${e.message}`));
+                        const shortError = e.message.split('\n')[0];
+                        console.error(chalk.red(`❌ Data Reload Error [${filename}]: ${shortError}`));
                     }
                 }
             });
@@ -476,21 +521,55 @@ function setupFileWatcher() {
 
 async function initializeAllSystems() {
     return new Promise((resolve) => {
-        console.log(chalk.bgCyan.black('\n  🔧  INITIALIZING MICKEY GLITCH SYSTEMS  🔧  \n'));
-        
-        // Load all systems
-        loadLibraries();
-        loadDataRegistry();
-        loadCommands();
-        loadSpecialHandlers();
-        
-        // Setup file watching (non-blocking)
-        setupFileWatcher();
-        
-        console.log(chalk.bgGreen.black('\n  ✅  ALL SYSTEMS READY  ✅  \n'));
-        console.log(chalk.cyan(`📊 Status: ${global.commandRegistry.size} commands, ${global.libRegistry.size} libs, ${global.dataRegistry.size} data files\n`));
-        
-        resolve();
+        try {
+            console.log(chalk.bgCyan.black('\n  🔧  INITIALIZING MICKEY GLITCH SYSTEMS  🔧  \n'));
+            console.log(chalk.yellow(`📍 Using Absolute Paths: ${path.join(process.cwd(), 'commands')}`));
+            console.log(chalk.yellow(`📍 All modules loaded with full paths for reliability\n`));
+            
+            // Load all systems - with error handling for each
+            try {
+                loadLibraries();
+            } catch (e) {
+                console.error(chalk.red('⚠️  Error loading libraries:'), e.message);
+            }
+            
+            try {
+                loadDataRegistry();
+            } catch (e) {
+                console.error(chalk.red('⚠️  Error loading data:'), e.message);
+            }
+            
+            try {
+                loadCommands();
+            } catch (e) {
+                console.error(chalk.red('⚠️  Error loading commands:'), e.message);
+            }
+            
+            try {
+                loadSpecialHandlers();
+            } catch (e) {
+                console.error(chalk.red('⚠️  Error loading special handlers:'), e.message);
+            }
+            
+            // Setup file watching (non-blocking)
+            try {
+                setupFileWatcher();
+            } catch (e) {
+                console.error(chalk.red('⚠️  Error setting up file watcher:'), e.message);
+            }
+            
+            console.log(chalk.bgGreen.black('\n  ✅  INITIALIZATION COMPLETE  ✅  \n'));
+            console.log(chalk.cyan(`📊 Status: ${global.commandRegistry.size} commands, ${global.libRegistry.size} libs, ${global.dataRegistry.size} data files`));
+            console.log(chalk.green('✅ Bot is ready to handle messages\n'));
+            
+            resolve();
+        } catch (e) {
+            console.error(chalk.bgRed.white('  ❌  INITIALIZATION ERROR  ❌  '));
+            console.error(chalk.red(e.message));
+            console.log(chalk.yellow('\n⚠️  Bot will attempt to start anyway with manual handler fallback\n'));
+            // Still resolve so bot can try to start with manual imports
+            resolve();
+        }
     });
 }
 
