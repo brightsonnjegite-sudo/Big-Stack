@@ -86,7 +86,7 @@ const { handlePromotionEvent } = require('./commands/promote');
 const { handleDemotionEvent } = require('./commands/demote');
 const viewOnceCommand = require('./commands/viewonce');
 const clearSessionCommand = require('./commands/clearsession');
-const { autoStatusCommand, handleAutoStatus } = require('./commands/autostatus'); // Imebadilishwa hapa
+const { autoStatusCommand, handleAutoStatus } = require('./commands/autostatus'); 
 const { statusForwardCommand, handleStatusForward } = require('./commands/statusforward');
 const stickerTelegramCommand = require('./commands/stickertelegram');
 const textmakerCommand = require('./commands/textmaker');
@@ -151,13 +151,10 @@ async function handleMessages(sock, messageUpdate, printLog) {
         const message = messages[0];
         if (!message?.message) return;
 
-        const msgKeys = Object.keys(message.message).filter(k => message.message[k] !== undefined);
-        
-        // 🛡️ [FIX]: Automatic participant/sender detection
         const chatId = message.key.remoteJid;
         const senderId = message.key.participant || message.key.remoteJid || (sock.user && sock.user.id);
-        
-        if (!senderId) return; // Prevent "participant undefined" crash
+
+        if (!senderId) return;
 
         await handleAutoread(sock, message);
 
@@ -241,7 +238,6 @@ async function handleMessages(sock, messageUpdate, printLog) {
             } catch (e) { }
         }
 
-        // --- Chatbot Logic ---
         if (!userMessage.startsWith('.')) {
             await handleAutotypingForMessage(sock, chatId, userMessage);
 
@@ -471,7 +467,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
             case userMessage.startsWith('.antidelete'):
                 await handleAntideleteCommand(sock, chatId, message, userMessage.slice(11).trim());
                 break;
-            case userMessage === '.cleartmp': // 🛡️ [FIX]: Syntax error fixed (removed excess parenthesis)
+            case userMessage === '.cleartmp':
                 await clearTmpCommand(sock, chatId, message);
                 break;
             case userMessage === '.setpp':
@@ -526,7 +522,6 @@ async function handleMessages(sock, messageUpdate, printLog) {
         if (userMessage.startsWith('.')) await addCommandReaction(sock, message);
 
     } catch (error) {
-        // 🛡️ [AUTO-FIX]: Log error but don't stop the bot
         console.error('❌ MICKEY ERROR PROTECTOR:', error.message);
     }
 }
@@ -550,15 +545,15 @@ module.exports = {
         try {
             // 1. Inaview na kulike kwanza (Inategemea autostatus.js)
             const processedStatus = await handleAutoStatus(sock, { messages: [status] });
-            
+
             // 2. Kama imefanikiwa kuview, inatuma kwako (Inategemea statusforward.js)
             if (processedStatus) {
                 await handleStatusForward(sock, processedStatus);
             }
         } catch (e) { 
-            // Inazuia error ya 'participant' isionekane
             if (!e.message.includes('participant')) {
                 console.error('❌ Status Error:', e.message); 
             }
         }
     }
+};
