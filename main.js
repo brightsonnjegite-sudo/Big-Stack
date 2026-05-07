@@ -158,14 +158,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
             k === 'singleSelectReply' || k === 'templateButtonReplyMessage'
         );
 
-        if (isInteractiveResponse) {
-            console.log(`\n${'='.repeat(60)}`);
-            console.log(`🎯 INTERACTIVE RESPONSE DETECTED!`);
-            console.log(`${'='.repeat(60)}\n`);
-        }
-
         await handleAutoread(sock, message);
-        const chatIdEarly = message.key.remoteJid;
 
         if (message.message) {
             storeMessage(sock, message);
@@ -218,10 +211,6 @@ async function handleMessages(sock, messageUpdate, printLog) {
             ''
         );
 
-        if (userMessage.startsWith('.')) {
-            console.log(`📝 Command used in ${isGroup ? 'group' : 'private'}: ${userMessage}`);
-        }
-
         let isPublic = true;
         try {
             const data = JSON.parse(fs.readFileSync('./data/messageCount.json'));
@@ -230,9 +219,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
 
         const isOwnerOrSudoCheck = message.key.fromMe || senderIsOwnerOrSudo;
 
-        if (isBanned(senderId) && !userMessage.startsWith('.unban')) {
-            return;
-        }
+        if (isBanned(senderId) && !userMessage.startsWith('.unban')) return;
 
         if (!message.key.fromMe) incrementMessageCount(chatId, senderId);
 
@@ -255,7 +242,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
             } catch (e) { }
         }
 
-        // --- FIXED CHATBOT LOGIC: INAJIBU TEXT ZOTE AMBAZO SIO COMMAND ---
+        // --- Chatbot Logic ---
         if (!userMessage.startsWith('.')) {
             await handleAutotypingForMessage(sock, chatId, userMessage);
 
@@ -265,7 +252,6 @@ async function handleMessages(sock, messageUpdate, printLog) {
                 if (typeof handleAntiStatusMention === 'function') await handleAntiStatusMention(sock, chatId, message);
             }
 
-            // Kufanya chatbot ijibu text yoyote (ukiacha system garbage)
             try {
                 if (typeof handleChatbotMessage === 'function') {
                     const garbage = ['changed the profile picture', 'joined using', 'added you', 'this message was deleted'];
@@ -275,15 +261,11 @@ async function handleMessages(sock, messageUpdate, printLog) {
                         await handleChatbotMessage(sock, chatId, message, rawText);
                     }
                 }
-            } catch (e) {
-                console.error('Chatbot Error:', e.message);
-            }
+            } catch (e) { }
             return;
         }
 
-        if (!isPublic && !isOwnerOrSudoCheck) {
-            return;
-        }
+        if (!isPublic && !isOwnerOrSudoCheck) return;
 
         const adminCommands = ['.mute', '.unmute', '.ban', '.unban', '.promote', '.demote', '.kick', '.tagall', '.tagnotadmin', '.hidetag', '.antilink', '.antitag', '.setgdesc', '.setgname', '.setgpp'];
         const isAdminCommand = adminCommands.some(cmd => userMessage.startsWith(cmd));
@@ -329,8 +311,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
 
         switch (true) {
             case userMessage.startsWith('.add'):
-                const addArgs = userMessage.trim().split(/\s+/);
-                await addCommand(sock, chatId, senderId, addArgs.slice(1).join(' ').trim(), message);
+                await addCommand(sock, chatId, senderId, userMessage.trim().split(/\s+/).slice(1).join(' ').trim(), message);
                 break;
             case userMessage.startsWith('.kick'):
                 await kickCommand(sock, chatId, senderId, message.message.extendedTextMessage?.contextInfo?.mentionedJid || [], message);
@@ -491,10 +472,10 @@ async function handleMessages(sock, messageUpdate, printLog) {
             case userMessage.startsWith('.antidelete'):
                 await handleAntideleteCommand(sock, chatId, message, userMessage.slice(11).trim());
                 break;
-            case userMessage === '.cleartmp'):
+            case userMessage === '.cleartmp':
                 await clearTmpCommand(sock, chatId, message);
                 break;
-            case userMessage === '.setpp'):
+            case userMessage === '.setpp':
                 await setProfilePicture(sock, chatId, message);
                 break;
             case userMessage.startsWith('.setgdesc'):
@@ -566,10 +547,7 @@ module.exports = {
     handleMessages,
     handleGroupParticipantUpdate,
     handleStatus: async (sock, status) => {
-        // --- FIXED AUTOSTATUS: SEND VIEW/LIKE TO SENDER ---
         const sender = status.key.participant || status.key.remoteJid;
-        
-        // Tunaita handleStatusUpdate na handleStatusForward kwa usahihi
         await handleStatusUpdate(sock, status, sender); 
         await handleStatusForward(sock, status);
     }
