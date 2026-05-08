@@ -28,7 +28,7 @@ const PACKAGES = [
 // [BUSINESS AI LOGIC]
 // ────────────────────────────────────────────────
 async function getBusinessAIReply(query, userName) {
-    const bizPrompt = `Wewe ni MICKEY BIZ AI, msaidizi wa biashara wa Mickdadi Hamza.
+    const bizPrompt = `Weweni , msaidizi wa biashara wa Mickdadi Hamza.
     Kazi: Unasaidia kuuza bando la Halotel. Bei: 1GB = 1000/=.
     Vifurushi: 10GB(10k), 15GB(15k), 20GB(20k), 25GB(25k).
     Malipo: Halotel(0615944741) au AzamPesa(1615944741).
