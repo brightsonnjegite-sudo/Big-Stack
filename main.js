@@ -149,9 +149,17 @@ const { anticallCommand, readState: readAnticallState } = require('./commands/an
 const { pinCommand, verifyPinCommand, checkPinVerification } = require('./commands/pin');
 const { pmblockerCommand, readState: readPmBlockerState } = require('./commands/pmblocker');
 const settingsCommand = require('./commands/settings');
-// const phoneCommand = require('./commands/phone'); // removed - file not found
+const ghostCommand = require('./commands/ghost');
+const newgroupCommand = require('./commands/newgroup');
+const gdriveCommand = require('./commands/gdrive');
+const getcodeCommand = require('./commands/getcode');
+const getlinkCommand = require('./commands/getlink');
+const shazamCommand = require('./commands/shazam');
+const repoCommand = require('./commands/repo');
+const statsCommand = require('./commands/stats');
+const stickerAltCommand = require('./commands/sticker-alt');
 
-// sora command removed
+
 
 // Global settings
 global.packname = settings.packname;
@@ -1177,6 +1185,34 @@ async function handleMessages(sock, messageUpdate, printLog) {
                     await checkUpdatesCommand(sock, chatId, message, checkUpdatesArgs);
                 }
                 commandExecuted = true;
+                break;
+            // Additional command cases
+            case userMessage.startsWith('.ghost'):
+                await ghostCommand(sock, chatId, message);
+                break;
+            case userMessage.startsWith('.newgroup'):
+                await newgroupCommand(sock, chatId, message);
+                break;
+            case userMessage.startsWith('.gdrive'):
+                await gdriveCommand(sock, chatId, message);
+                break;
+            case userMessage.startsWith('.getcode'):
+                await getcodeCommand(sock, chatId, message);
+                break;
+            case userMessage.startsWith('.getlink'):
+                await getlinkCommand(sock, chatId, message);
+                break;
+            case userMessage.startsWith('.shazam'):
+                await shazamCommand(sock, chatId, message);
+                break;
+            case userMessage.startsWith('.repo'):
+                await repoCommand(sock, chatId, message);
+                break;
+            case userMessage.startsWith('.stats'):
+                await statsCommand(sock, chatId, message);
+                break;
+            case userMessage.startsWith('.stickeralt'):
+                await stickerAltCommand(sock, chatId, message);
                 break;
             // .removebg command removed
             // .remini command removed

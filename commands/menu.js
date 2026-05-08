@@ -18,7 +18,90 @@ const menuCommand = async (sock, chatId, m) => {
         const commandsDir = path.join(__dirname, '../commands');
         const commandFiles = fs.readdirSync(commandsDir).filter(file => file.endsWith('.js'));
 
+        const mainJsPath = path.join(__dirname, '../main.js');
+        const mainSource = fs.existsSync(mainJsPath) ? fs.readFileSync(mainJsPath, 'utf8') : '';
+        const commandTriggers = extractCommandTriggers(mainSource);
+
         const menuSections = {};
+
+        function extractCommandTriggers(source) {
+            const handlerToFile = {};
+            const importRegex = /const\s+(?:\{([^}]+)\}|(\w+))\s*=\s*require\(\s*['"]\.\/commands\/([^'"]+)['"]\s*\);/g;
+            let match;
+
+            while ((match = importRegex.exec(source)) !== null) {
+                const destructured = match[1];
+                const singleName = match[2];
+                const fileName = match[3];
+
+                if (destructured) {
+                    destructured.split(',').map(name => name.trim()).forEach(name => {
+                        if (name) {
+                            handlerToFile[name] = fileName;
+                        }
+                    });
+                } else if (singleName) {
+                    handlerToFile[singleName] = fileName;
+                }
+            }
+
+            const lines = source.split(/\r?\n/);
+            const mapping = {};
+            let activeTriggers = [];
+
+            function addTriggers(handler) {
+                const fileName = handlerToFile[handler];
+                if (!fileName || activeTriggers.length === 0) return;
+                if (!mapping[fileName]) mapping[fileName] = new Set();
+                activeTriggers.forEach(trigger => mapping[fileName].add(trigger));
+                activeTriggers = [];
+            }
+
+            function parseTriggers(text) {
+                const triggers = [];
+                const exactRegex = /userMessage\s*===\s*['"]([^'"]+)['"]/g;
+                const startsRegex = /userMessage\.startsWith\(\s*['"]([^'"]+)['"]\s*\)/g;
+                let m;
+
+                while ((m = exactRegex.exec(text)) !== null) {
+                    triggers.push(m[1].trim());
+                }
+                while ((m = startsRegex.exec(text)) !== null) {
+                    triggers.push(m[1].trim().replace(/\s+$/, ''));
+                }
+                return triggers;
+            }
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                const caseMatch = trimmed.match(/^case\s+(.+?):(.*)$/);
+                if (caseMatch) {
+                    activeTriggers = parseTriggers(caseMatch[1]);
+                    const afterCase = caseMatch[2].trim();
+                    if (afterCase.length > 0) {
+                        const awaitMatch = afterCase.match(/await\s+(\w+)\s*\(/);
+                        if (awaitMatch) {
+                            addTriggers(awaitMatch[1]);
+                            continue;
+                        }
+                    }
+                    continue;
+                }
+
+                const awaitMatch = trimmed.match(/await\s+(\w+)\s*\(/);
+                if (awaitMatch) {
+                    addTriggers(awaitMatch[1]);
+                    continue;
+                }
+
+                const callMatch = trimmed.match(/^(?:const\s+\w+\s*=\s*)?(\w+)\s*\(/);
+                if (callMatch && activeTriggers.length > 0) {
+                    addTriggers(callMatch[1]);
+                }
+            }
+
+            return Object.fromEntries(Object.entries(mapping).map(([key, set]) => [key, Array.from(set)]));
+        }
 
         for (const file of commandFiles) {
             // Epuka faili za mfumo zisizo na amri za watumiaji
@@ -30,17 +113,30 @@ const menuCommand = async (sock, chatId, m) => {
                 const cmdFile = require(path.join(commandsDir, file));
 
                 // 🛠️ LOGIC YA KUPATA JINA HALISI:
-                // 1. Inatafuta 'command' 2. Inatafuta 'alias' ya kwanza 3. Inatafuta 'name' 4. Mwisho ni jina la faili
-                let cmdName = cmdFile.command || 
-                              (Array.isArray(cmdFile.alias) ? cmdFile.alias[0] : cmdFile.alias) || 
-                              cmdFile.name || 
-                              file.replace('.js', '');
+                // 1. Inatafuta metadata ya amri kama command/alias/name
+                // 2. Inapotofautiana na main.js, inatumia amri zilizoonyeshwa huko
+                const fileKey = file.replace('.js', '');
+                const mainTriggers = commandTriggers[fileKey] || [];
 
-                // Kusafisha jina: Herufi ndogo na kufuta maneno ya ziada
-                cmdName = cmdName.toString().toLowerCase().replace('command', '').trim();
+                const normalizeCommandName = name => {
+                    if (!name) return '';
+                    return name.toString().toLowerCase().replace(/^\.+/, '').replace('command', '').trim();
+                };
+
+                let cmdName = normalizeCommandName(cmdFile.command) ||
+                              normalizeCommandName(Array.isArray(cmdFile.alias) ? cmdFile.alias[0] : cmdFile.alias) ||
+                              normalizeCommandName(cmdFile.name) ||
+                              normalizeCommandName(mainTriggers[0]) ||
+                              fileKey;
+
+                const aliases = mainTriggers.slice(1).map(t => t.replace(/^[.]/, ''))
+                    .filter(alias => alias && alias !== cmdName);
 
                 const category = (cmdFile.category || 'Mengineyo').toUpperCase();
-                const description = cmdFile.description || `Tumia amri ya .${cmdName}`;
+                let description = cmdFile.description || `Tumia amri ya .${cmdName}`;
+                if (aliases.length) {
+                    description += ` | Aliases: ${aliases.map(a => `.${a}`).join(', ')}`;
+                }
 
                 if (!menuSections[category]) {
                     menuSections[category] = [];
