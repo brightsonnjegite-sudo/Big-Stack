@@ -29,9 +29,9 @@ async function tryRequest(getter, attempts = 3) {
 // Get MP3 from YouTube with enhanced error handling
 async function getYoutubeMp3(ytUrl) {
     const apis = [
-        `https://apiskeith.top/download/mp3?url=${encodeURIComponent(ytUrl)}`,
-        `https://api.davidcyriltech.my.id/download/ytmp3?url=${encodeURIComponent(ytUrl)}`,
-        `https://api.giftedtech.my.id/api/download/ytmp3?url=${encodeURIComponent(ytUrl)}`
+        `https://apiskeith.top/download/audio?url=${encodeURIComponent(ytUrl)}`,
+        `https://eliteprotech-apis.zone.id/ytmp3?url=${encodeURIComponent(ytUrl)}`,
+        `https://apiskeith.top/download/ytv3?url=${encodeURIComponent(ytUrl)}`
     ];
 
     for (const api of apis) {
@@ -53,6 +53,8 @@ async function getYoutubeMp3(ytUrl) {
                 downloadUrl = res.data.url;
             } else if (res.data?.download) {
                 downloadUrl = res.data.download;
+            } else if (res.data?.audio) {
+                downloadUrl = res.data.audio;
             }
 
             if (downloadUrl && typeof downloadUrl === 'string') {
@@ -137,9 +139,6 @@ async function handleAudioDownload(sock, chatId, ytUrl, message, videoInfo = nul
         console.error('Audio download error:', e);
         await sock.sendMessage(chatId, { react: { text: '❌', key: message.key } });
         await sock.sendMessage(chatId, { text: "❌ *Download imefeli:* " + (e.message || 'API haipatikani') }, { quoted: message });
-    }
-}
-
     }
 }
 
