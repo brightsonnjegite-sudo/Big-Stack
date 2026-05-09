@@ -41,7 +41,6 @@ async function getYoutubeMp3(ytUrl) {
             // Handle different API response structures
             let downloadUrl = null;
             if (res.data?.status && res.data?.result) {
-                // Check if result is a string URL or an object
                 if (typeof res.data.result === 'string') {
                     downloadUrl = res.data.result;
                 } else if (typeof res.data.result === 'object' && res.data.result?.url) {
@@ -77,12 +76,10 @@ async function playCommand(sock, chatId, message) {
 
         await sock.sendMessage(chatId, { react: { text: '🔍', key: message.key } });
 
-        // Enhanced YouTube search with better error handling
         const s = await yts(q);
         const v = s?.videos?.[0];
         if (!v) return sock.sendMessage(chatId, { text: '❌ Sikuipata wimbo huo! Jaribu kutafuta kwa maneno mengine.' });
 
-        // Send thumbnail first for better UX
         try {
             await sock.sendMessage(chatId, {
                 image: { url: v.thumbnail },
@@ -92,7 +89,6 @@ async function playCommand(sock, chatId, message) {
             console.log('Thumbnail send failed, continuing...');
         }
 
-        // Direct download MP3 with enhanced handling
         await handleAudioDownload(sock, chatId, v.url, message, v);
 
     } catch (err) {
@@ -102,34 +98,19 @@ async function playCommand(sock, chatId, message) {
     }
 }
 
-// Enhanced audio download with thumbnail integration
 async function handleAudioDownload(sock, chatId, ytUrl, message, videoInfo = null) {
     try {
         await sock.sendMessage(chatId, { react: { text: '📥', key: message.key } });
 
         const data = await getYoutubeMp3(ytUrl);
 
-        // Send audio with enhanced metadata
+        // Audio message bila contextInfo (picha ndogo/ad info)
         const audioMessage = {
             audio: { url: data.download },
             mimetype: 'audio/mp4',
             ptt: false,
             fileName: videoInfo?.title ? `${videoInfo.title}.mp3` : 'audio.mp3'
         };
-
-        // Add context info if available
-        if (videoInfo) {
-            audioMessage.contextInfo = {
-                externalAdReply: {
-                    title: videoInfo.title,
-                    body: `👤 ${videoInfo.author.name}`,
-                    thumbnailUrl: videoInfo.thumbnail,
-                    sourceUrl: ytUrl,
-                    mediaType: 2,
-                    showAdAttribution: true
-                }
-            };
-        }
 
         await sock.sendMessage(chatId, audioMessage, { quoted: message });
 
