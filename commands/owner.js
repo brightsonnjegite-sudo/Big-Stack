@@ -3,22 +3,27 @@ const settings = require('../settings');
 
 /**
  * ownerCommand - Mickey Glitch Bot Owner Info
- * Inajumuisha Button Handler na vCard Auto-Send
+ * Version: Fixed 'key' undefined error
  */
-async function ownerCommand(sock, chatId, message, body = '') {
+async function ownerCommand(sock, chatId, m, body = '') {
     try {
+        // 1. Safety Check kwa ajili ya 'message' object
+        if (!sock || !chatId || !m) {
+            return console.error('❌ Missing core parameters in ownerCommand');
+        }
+
+        // 2. Data za Owner
         const ownerNumberRaw = settings.ownerNumber || '255612130873';
         const ownerName = settings.botOwner || 'Mickey Developer';
         const botName = settings.botName || 'MICKEY GLITCH';
         
-        // Safisha namba kwa ajili ya vCard na Links
         const cleanNumber = ownerNumberRaw.replace(/[^\d]/g, '');
         const waLink = `https://wa.me/${cleanNumber}`;
         const channelLink = 'https://whatsapp.com/channel/0029Vb6B9xFCxoAseuG1g610';
 
-        // 1. [BUTTON HANDLER] - Kushughulikia akibonyeza "Get Business Card"
+        // 3. [BUTTON HANDLER]
         const input = (body || '').toLowerCase().trim();
-        if (input === 'get_vcard') {
+        if (input === 'get_vcard' || input === '.get_vcard') {
             const vcard = 'BEGIN:VCARD\n' +
                 'VERSION:3.0\n' +
                 `FN:${ownerName}\n` +
@@ -31,30 +36,34 @@ async function ownerCommand(sock, chatId, message, body = '') {
                     displayName: ownerName,
                     contacts: [{ vcard }]
                 }
-            }, { quoted: message });
+            }, { quoted: m });
         }
 
-        // 2. [MAIN UI] - Kutuma ujumbe wa Owner
+        // 4. [MAIN UI]
         const ownerText = `👑 *BOT OWNER INFORMATION*
 
-*🤖 Bot Name:* ${botName}
+*🤖 Bot:* ${botName}
 *👤 Owner:* ${ownerName}
 *📞 Contact:* +${cleanNumber}
-*📍 Location:* Dar es Salaam, TZ
 
-_Unahitaji msaada, matengenezo ya bot, au projects za coding? Wasiliana na bosi hapo chini._ 👇`;
+_Wasiliana na mkuu kwa msaada zaidi au projects._ 👇`;
 
         const imageUrl = 'https://water-billing-292n.onrender.com/1761205727440.png';
 
+        // Piga reaction kwa usalama (Check if m.key exists)
+        if (m.key) {
+            await sock.sendMessage(chatId, { react: { text: '👑', key: m.key } }).catch(() => null);
+        }
+
         const msgOptions = {
             text: ownerText,
-            footer: "Mickey Glitch Tech • Innovating the Future",
+            footer: "Mickey Glitch Tech • 2026",
             image: { url: imageUrl },
             interactiveButtons: [
                 { 
                     name: 'cta_url', 
                     buttonParamsJson: JSON.stringify({ 
-                        display_text: '💬 Chat on WhatsApp', 
+                        display_text: '💬 WhatsApp Chat', 
                         url: waLink 
                     }) 
                 },
@@ -75,17 +84,15 @@ _Unahitaji msaada, matengenezo ya bot, au projects za coding? Wasiliana na bosi 
             ]
         };
 
-        await sock.sendMessage(chatId, { react: { text: '👑', key: message.key } });
-        await sendInteractiveMessage(sock, chatId, msgOptions, { quoted: message });
+        await sendInteractiveMessage(sock, chatId, msgOptions, { quoted: m });
 
     } catch (e) {
         console.error('Owner Cmd Error:', e);
+        // Tuma error message bila kutegemea reaction
         await sock.sendMessage(chatId, { 
-            text: '❌ *Hitilafu:* ' + (e.message || 'Jaribu tena.') 
-        }, { quoted: message });
+            text: '❌ *Hitilafu imetokea kwenye mfumo.*' 
+        }).catch(err => console.log('Final fallback failed'));
     }
 }
 
 module.exports = ownerCommand;
-module.exports.name = 'owner';
-module.exports.category = 'GENERAL';
