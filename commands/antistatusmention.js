@@ -2,168 +2,134 @@ const fs = require('fs');
 const path = require('path');
 const isAdmin = require('../lib/isAdmin');
 
+// Safisha na pakia state
 function loadState() {
-  try {
-    const raw = fs.readFileSync(path.join(__dirname, '..', 'data', 'antistatusmention.json'), 'utf8');
-    const state = JSON.parse(raw);
-    if (!state.perGroup) state.perGroup = {};
-    return state;
-  } catch (e) {
-    return { perGroup: {} };
-  }
+    try {
+        const raw = fs.readFileSync(path.join(__dirname, '..', 'data', 'antistatusmention.json'), 'utf8');
+        const state = JSON.parse(raw);
+        if (!state.perGroup) state.perGroup = {};
+        return state;
+    } catch (e) {
+        return { perGroup: {} };
+    }
 }
 
 function saveState(state) {
-  try {
-    const dataDir = path.join(__dirname, '..', 'data');
-    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-    fs.writeFileSync(path.join(dataDir, 'antistatusmention.json'), JSON.stringify(state, null, 2));
-  } catch (e) {
-    console.error('Failed to save antistatusmention state:', e?.message || e);
-  }
+    try {
+        const dataDir = path.join(__dirname, '..', 'data');
+        if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+        fs.writeFileSync(path.join(dataDir, 'antistatusmention.json'), JSON.stringify(state, null, 2));
+    } catch (e) {
+        console.error('Failed to save state:', e?.message);
+    }
 }
 
 function isEnabledForChat(state, chatId) {
-  if (!state) return false;
-  if (typeof state.perGroup?.[chatId] === 'boolean') return !!state.perGroup[chatId];
-  return false;
+    return !!state?.perGroup?.[chatId];
 }
 
 async function handleAntiStatusMention(sock, chatId, message) {
-  try {
-    // Only operate in groups on incoming messages
-    if (!chatId || !chatId.endsWith('@g.us')) return;
-    if (!message?.message) return;
-    if (message.key?.fromMe) return; // ignore our own messages
-
-    const state = loadState();
-    if (!isEnabledForChat(state, chatId)) return;
-
-    // Normalize bot JID and prepare mention heuristics
-    const rawBotId = sock.user?.id || sock.user?.jid || '';
-    const botNum = rawBotId.split('@')[0].split(':')[0];
-
-    // Extract text content from many possible message shapes
-    const msg = message.message || {};
-    const text = (
-      msg.conversation ||
-      msg.extendedTextMessage?.text ||
-      msg.imageMessage?.caption ||
-      msg.videoMessage?.caption ||
-      msg.listResponseMessage?.singleSelectReply?.selectedRowId ||
-      ''
-    ).toString();
-    if (!text) return;
-
-    // If the message explicitly mentions users, ignore (we only target status-mention spam)
-    const mentionedJids = [];
-    const ctxs = [
-      msg.extendedTextMessage?.contextInfo,
-      msg.imageMessage?.contextInfo,
-      msg.videoMessage?.contextInfo,
-      msg.listResponseMessage?.contextInfo,
-      msg.buttonsResponseMessage?.contextInfo
-    ].filter(Boolean);
-    for (const c of ctxs) {
-      if (Array.isArray(c?.mentionedJid)) mentionedJids.push(...c.mentionedJid);
-    }
-    if (Array.isArray(msg?.mentionedJid)) mentionedJids.push(...msg.mentionedJid);
-
-    if (mentionedJids.length > 0) return; // actual mentions are not status mention spam
-
-    // Heuristic: many status-mention spam messages use phrases like "mentioned this group" or "status mention"
-    const phraseRegex = /\b(mention(?:ed)?\s+(?:this\s+)?group|mentioned\s+(?:this\s+)?group|status\s+mention(?:ed)?|mentioned\s+in\s+status|mention\s+status)\b/i;
-    if (!phraseRegex.test(text)) {
-      // Fallback heuristic: message contains bot number like @123456 - often used in status mention captions
-      const stripped = text.replace(/\s+/g, '');
-      if (!new RegExp(`@?${botNum}\b`).test(stripped)) return;
-    }
-
-    // Don't delete messages from group admins (safer) or from the bot itself
-    const sender = message.key.participant || message.key.remoteJid;
-    const senderAdminInfo = await isAdmin(sock, chatId, sender).catch(() => ({ isSenderAdmin: false }));
-    if (senderAdminInfo.isSenderAdmin) return;
-
-    // Ensure bot is admin so we can delete
-    const botAdminInfo = await isAdmin(sock, chatId, rawBotId).catch(() => ({ isBotAdmin: false }));
-    if (!botAdminInfo.isBotAdmin) return;
-
-    // Attempt to delete the offending message (best-effort)
     try {
-      const messageId = message.key.id;
-      const participant = message.key.participant || message.key.remoteJid;
+        if (!chatId?.endsWith('@g.us') || !message?.message || message.key?.fromMe) return;
 
-      console.log('AntiStatusMention: matched phrase, attempting delete', { chatId, msgId: messageId, participant });
+        const state = loadState();
+        if (!isEnabledForChat(state, chatId)) return;
 
-      // Try to delete using the existing key (preferred)
-      let deleted = false;
-      try {
-        if (message.key) {
-          await sock.sendMessage(chatId, { delete: message.key });
-          deleted = true;
-          console.log('Message deleted successfully using message.key method');
+        const rawBotId = sock.user?.id || '';
+        const botNum = rawBotId.split('@')[0].split(':')[0];
+
+        const msg = message.message || {};
+        const text = (
+            msg.conversation ||
+            msg.extendedTextMessage?.text ||
+            msg.imageMessage?.caption ||
+            msg.videoMessage?.caption ||
+            ''
+        ).toString();
+
+        if (!text) return;
+
+        // 1. NGUVU MPYA: Detect Hidden Mentions & Spam Patterns
+        // Inatafuta maneno kama "Mentioned you", "Status", au tag feki za @everyone
+        const spamPatterns = [
+            /mention(ed)?\s+(you|this|group|in\s+status)/i,
+            /status\s+mention/i,
+            /view\s+status/i,
+            /@everyone/i, // Baadhi ya status spam hutumia hii kudanganya watu
+            /@\d+/ // Inatafuta namba zilizowekwa tag bila kuwa real mentions
+        ];
+
+        let isSpam = spamPatterns.some(pattern => pattern.test(text));
+
+        // 2. NGUVU MPYA: Check invisible/zero-width characters (Mbinu mpya ya kuzuia bot)
+        if (!isSpam) {
+            const invisibleChars = /[\u200B-\u200D\uFEFF]/;
+            if (invisibleChars.test(text) && text.includes(botNum)) isSpam = true;
         }
-      } catch (err1) {
-        // Structured fallback
+
+        // 3. NGUVU MPYA: Bot Number Detection (Heuristic)
+        if (!isSpam && text.includes(botNum)) {
+            // Ikiwa message ina namba ya bot na haina mentionedJid, ni 90% status mention
+            const mentionedJids = msg.extendedTextMessage?.contextInfo?.mentionedJid || [];
+            if (mentionedJids.length === 0) isSpam = true;
+        }
+
+        if (!isSpam) return;
+
+        // 4. USALAMA: Check Admin Status
+        const sender = message.key.participant || message.key.remoteJid;
+        const senderAdminInfo = await isAdmin(sock, chatId, sender).catch(() => ({ isSenderAdmin: false }));
+        if (senderAdminInfo.isSenderAdmin) return;
+
+        const botAdminInfo = await isAdmin(sock, chatId, rawBotId).catch(() => ({ isBotAdmin: false }));
+        if (!botAdminInfo.isBotAdmin) return;
+
+        // 5. ACTION: Futa Message
+        const messageId = message.key.id;
         try {
-          const deleteKey = { remoteJid: chatId, fromMe: false, id: messageId, participant };
-          await sock.sendMessage(chatId, { delete: deleteKey });
-          deleted = true;
-          console.log('Message deleted successfully using structured deleteKey');
-        } catch (err2) {
-          try {
-            await sock.sendMessage(chatId, { delete: { remoteJid: chatId, id: messageId } });
-            deleted = true;
-            console.log('Message deleted successfully using ID-only fallback');
-          } catch (err3) {
-            console.error('All delete methods failed:', err1?.message || err1, err2?.message || err2, err3?.message || err3);
-          }
+            await sock.sendMessage(chatId, { delete: message.key });
+            
+            // Tuma onyo fupi
+            await sock.sendMessage(chatId, { 
+                text: `🚫 *ANTI-STATUS SPAM*\n\nNimefuta ujumbe kutoka kwa @${sender.split('@')[0]} kwa sababu una dalili za Status Mention Spam.`,
+                mentions: [sender]
+            });
+            
+            console.log(`[AntiStatus] Deleted spam from ${sender} in ${chatId}`);
+        } catch (err) {
+            console.error('Failed to delete spam:', err.message);
         }
-      }
 
-      // Optionally notify group (avoid tagging the sender)
-      try {
-        const senderName = sender ? `@${sender.split('@')[0]}` : 'User';
-        const status = deleted ? '✅ Message deleted' : '⚠️ Attempted to delete but failed';
-        await sock.sendMessage(chatId, { text: `ℹ️ *Anti-Status-Mention*
-
-• Sender: ${senderName}
-• Action: ${status}
-
-If the message persists, ensure the bot has admin rights and the message is still removable.` });
-      } catch (e) {
-        console.error('Failed to send info message:', e?.message || e);
-      }
-    } catch (e) {
-      console.error('Failed to handle status mention message:', e?.message || e);
+    } catch (err) {
+        console.error('handleAntiStatusMention error:', err);
     }
-  } catch (err) {
-    console.error('handleAntiStatusMention error:', err?.message || err);
-  }
 }
 
 async function groupAntiStatusToggleCommand(sock, chatId, message, args) {
-  try {
-    if (!chatId || !chatId.endsWith('@g.us')) return sock.sendMessage(chatId, { text: 'This command only works in groups.' }, { quoted: message });
+    try {
+        if (!chatId?.endsWith('@g.us')) return;
 
-    const sender = message.key.participant || message.key.remoteJid;
-    const adminInfo = await isAdmin(sock, chatId, sender);
-    if (!adminInfo.isSenderAdmin && !message.key.fromMe) return sock.sendMessage(chatId, { text: 'Only group admins can toggle anti-status-mention.' }, { quoted: message });
+        const sender = message.key.participant || message.key.remoteJid;
+        const adminInfo = await isAdmin(sock, chatId, sender);
+        
+        if (!adminInfo.isSenderAdmin && !message.key.fromMe) {
+            return sock.sendMessage(chatId, { text: '❌ Amri hii ni kwa Admins tu.' }, { quoted: message });
+        }
 
-    const onoff = (args || '').trim().toLowerCase();
-    if (!onoff || !['on', 'off'].includes(onoff)) {
-      return sock.sendMessage(chatId, { text: 'Usage: .antistatusmention on|off' }, { quoted: message });
+        const onoff = (args[0] || '').toLowerCase();
+        if (!['on', 'off'].includes(onoff)) {
+            return sock.sendMessage(chatId, { text: 'Matumizi: .antistatusmention on/off' }, { quoted: message });
+        }
+
+        const state = loadState();
+        state.perGroup[chatId] = onoff === 'on';
+        saveState(state);
+
+        await sock.sendMessage(chatId, { react: { text: '🛡️', key: message.key } });
+        return sock.sendMessage(chatId, { text: `🛡️ Anti-Status-Mention sasa ipo: *${onoff.toUpperCase()}*` }, { quoted: message });
+    } catch (e) {
+        console.error(e);
     }
-
-    const state = loadState();
-    state.perGroup = state.perGroup || {};
-    state.perGroup[chatId] = onoff === 'on';
-    saveState(state);
-    return sock.sendMessage(chatId, { text: `Anti-status-mention is now ${state.perGroup[chatId] ? 'ON' : 'OFF'} for this group.` }, { quoted: message });
-  } catch (e) {
-    console.error('groupAntiStatusToggleCommand error:', e);
-    return sock.sendMessage(chatId, { text: 'Failed to toggle anti-status-mention.' }, { quoted: message });
-  }
 }
 
 module.exports = { handleAntiStatusMention, groupAntiStatusToggleCommand };
