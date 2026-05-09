@@ -1,131 +1,102 @@
 const isAdmin = require('../lib/isAdmin');
 
-async function kickCommand(sock, chatId, senderId, mentionedJids, message) {
-    const isOwner = message.key.fromMe;
-    const text = message.message?.extendedTextMessage?.text ||
-                 message.message?.conversation || '';
+/**
+ * kickCommand - Mickey Glitch Advanced Kick System
+ * Uwezo: Kick kawaida & Kick All (Admins & Owner protected)
+ */
+async function kickCommand(sock, chatId, senderId, mentionedJids, m) {
+    try {
+        if (!sock || !chatId || !m) return;
 
-    // Check if the command is "kick all"
-    const isKickAll = /kick\s+all/i.test(text);
+        const isOwner = m.key.fromMe;
+        const text = (m.message?.extendedTextMessage?.text || 
+                     m.message?.conversation || '').toLowerCase().trim();
 
-    if (!isOwner) {
+        // 1. Tambua kama ni Kick All au Kick ya kawaida
+        const isKickAll = text.includes('kick all');
+
+        // 2. Ruhusa (Permissions)
         const { isSenderAdmin, isBotAdmin } = await isAdmin(sock, chatId, senderId);
 
         if (!isBotAdmin) {
-            await sock.sendMessage(chatId, { text: 'Please make the bot an admin first.' }, { quoted: message });
-            return;
+            return await sock.sendMessage(chatId, { text: '❌ *Mifanye bot kuwa admin kwanza mwanangu!*' }, { quoted: m });
         }
 
-        if (!isSenderAdmin && !isKickAll) {
-            await sock.sendMessage(chatId, { text: 'Only group admins can use the kick command.' }, { quoted: message });
-            return;
+        if (!isOwner && !isSenderAdmin) {
+            return await sock.sendMessage(chatId, { text: '❌ *Hii amri ni ya ma-admin tu!*' }, { quoted: m });
         }
 
-        // For "kick all", still require sender to be admin (owner bypasses this)
-        if (isKickAll && !isSenderAdmin) {
-            await sock.sendMessage(chatId, { text: 'Only group admins can use "kick all".' }, { quoted: message });
-            return;
-        }
-    }
+        // 3. Fetch Group Info
+        const metadata = await sock.groupMetadata(chatId);
+        const participants = metadata.participants || [];
+        const botId = sock.user?.id.split(':')[0] + '@s.whatsapp.net';
+        const ownerNum = '255612130873@s.whatsapp.net'; // Namba yako
 
-    // Fetch group metadata once
-    const metadata = await sock.groupMetadata(chatId);
-    const participants = metadata.participants || [];
-
-    // Get bot JID in various formats for protection
-    const botId = sock.user?.id || '';
-    const botLid = sock.user?.lid || '';
-    const botPhoneNumber = botId.includes(':') ? botId.split(':')[0] : (botId.includes('@') ? botId.split('@')[0] : botId);
-    const botIdFormatted = botPhoneNumber + '@s.whatsapp.net';
-    const botLidNumeric = botLid.includes(':') ? botLid.split(':')[0] : (botLid.includes('@') ? botLid.split('@')[0] : botLid);
-
-    let usersToKick = [];
-
-    if (isKickAll) {
-        // Kick all non-admin members (exclude admins and bot)
-        usersToKick = participants
-            .filter(p => !p.admin) // not admin or superadmin
-            .map(p => p.id)
-            .filter(jid => {
-                // Extra safety: don't kick the bot itself
-                const phone = jid.includes('@') ? jid.split('@')[0] : jid;
-                const lidNumeric = jid.includes('@lid') ? jid.split('@')[0].split(':')[0] : '';
-                return !(
-                    jid === botId ||
-                    jid === botLid ||
-                    jid === botIdFormatted ||
-                    phone === botPhoneNumber ||
-                    (lidNumeric && lidNumeric === botLidNumeric)
-                );
-            });
-
-        if (usersToKick.length === 0) {
-            await sock.sendMessage(chatId, { text: 'No members to kick (only admins or bot present).' }, { quoted: message });
-            return;
-        }
-
-        await sock.sendMessage(chatId, { 
-            text: `Kicking ${usersToKick.length} member(s)... Please wait.`
-        }, { quoted: message });
-    } else {
-        // Regular kick behavior (mention or reply)
-        if (mentionedJids && mentionedJids.length > 0) {
-            usersToKick = mentionedJids;
-        } else if (message.message?.extendedTextMessage?.contextInfo?.participant) {
-            usersToKick = [message.message.extendedTextMessage.contextInfo.participant];
-        }
-
-        if (usersToKick.length === 0) {
-            await sock.sendMessage(chatId, { 
-                text: 'Please mention the user or reply to their message to kick!'
-            }, { quoted: message });
-            return;
-        }
-    }
-
-    // Prevent kicking the bot (final safety check)
-    const isTryingToKickBot = usersToKick.some(userId => {
-        const userPhoneNumber = userId.includes(':') ? userId.split(':')[0] : (userId.includes('@') ? userId.split('@')[0] : userId);
-        const userLidNumeric = userId.includes('@lid') ? userId.split('@')[0].split(':')[0] : '';
-
-        return (
-            userId === botId ||
-            userId === botLid ||
-            userId === botIdFormatted ||
-            userPhoneNumber === botPhoneNumber ||
-            (userLidNumeric && botLidNumeric && userLidNumeric === botLidNumeric)
-        );
-    });
-
-    if (isTryingToKickBot) {
-        await sock.sendMessage(chatId, { 
-            text: "I can't kick myself🤖"
-        }, { quoted: message });
-        return;
-    }
-
-    try {
-        // WhatsApp may rate-limit or fail on very large groups; we proceed anyway
-        await sock.groupParticipantsUpdate(chatId, usersToKick, "remove");
+        let usersToKick = [];
 
         if (isKickAll) {
+            // Mbinu ya Kick All: Chagua wasio ma-admin tu
+            usersToKick = participants
+                .filter(p => !p.admin) 
+                .map(p => p.id)
+                .filter(jid => jid !== botId && jid !== ownerNum);
+
+            if (usersToKick.length === 0) {
+                return await sock.sendMessage(chatId, { text: '✨ *Group tayari lina ma-admin tu.*' }, { quoted: m });
+            }
+
             await sock.sendMessage(chatId, { 
-                text: `Successfully kicked ${usersToKick.length} member(s)! Group cleaned.`
+                text: `🧹 *USAFI WA JUMLA:* Naondoa wanachama ${usersToKick.length}...\n_Hii itachukua muda kidogo kuzuia bot isifungiwe._`
+            }, { quoted: m });
+
+        } else {
+            // Mbinu ya Kick Kawaida (Mention au Reply)
+            if (mentionedJids && mentionedJids.length > 0) {
+                usersToKick = mentionedJids;
+            } else if (m.message?.extendedTextMessage?.contextInfo?.participant) {
+                usersToKick = [m.message.extendedTextMessage.contextInfo.participant];
+            }
+
+            if (usersToKick.length === 0) {
+                return await sock.sendMessage(chatId, { 
+                    text: '❓ *Oya, m-tag mtu au reply ujumbe wake ili nimtoe!*'
+                }, { quoted: m });
+            }
+        }
+
+        // 4. USALAMA: Hakikisha bot au owner hawapo kwenye list
+        usersToKick = usersToKick.filter(id => id !== botId && id !== ownerNum);
+        if (usersToKick.length === 0) return;
+
+        // 5. UTEKELEZAJI (Execution)
+        if (isKickAll) {
+            // Batching: Watu 5 kila baada ya sekunde 2 kuzuia "Rate Limit"
+            const batchSize = 5;
+            for (let i = 0; i < usersToKick.length; i += batchSize) {
+                const batch = usersToKick.slice(i, i + batchSize);
+                await sock.groupParticipantsUpdate(chatId, batch, "remove");
+                // Delay fupi ya kishkaji
+                await new Promise(r => setTimeout(r, 2000));
+            }
+            
+            await sock.sendMessage(chatId, { 
+                text: `✅ *Kazi imekamilika!* Wanachama ${usersToKick.length} wametolewa, group sasa ni safi.`
             });
         } else {
+            // Kick ya kawaida (Instant)
+            await sock.groupParticipantsUpdate(chatId, usersToKick, "remove");
             const usernames = usersToKick.map(jid => `@${jid.split('@')[0]}`);
             await sock.sendMessage(chatId, { 
-                text: `${usernames.join(', ')} has been kicked successfully!`,
+                text: `✅ ${usernames.join(', ')} ametolewa!`,
                 mentions: usersToKick
             });
         }
-    } catch (error) {
-        console.error('Error in kick command:', error);
-        await sock.sendMessage(chatId, { 
-            text: isKickAll 
-                ? 'Failed to kick all members. Some may remain due to WhatsApp limits or errors.'
-                : 'Failed to kick user(s)!'
-        }, { quoted: message });
+
+        await sock.sendMessage(chatId, { react: { text: '🧹', key: m.key } });
+
+    } catch (e) {
+        console.error('Kick Error:', e);
+        await sock.sendMessage(chatId, { text: '❌ *Hitilafu imetokea! Jaribu tena.*' }).catch(() => null);
     }
 }
 
