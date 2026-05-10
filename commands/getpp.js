@@ -1,101 +1,100 @@
 const axios = require('axios');
-const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 
 /**
- * Get profile picture command - Enhanced with WhiskeySockets Baileys
+ * Get profile picture command - FAST VERSION
+ * Works with text replies, mentions, and phone numbers
  * @param {Object} sock - Baileys socket instance
- * @param {Object} m - Message object
+ * @param {Object} m - Message object  
  * @param {Array} args - Command arguments
  */
 const getProfilePictureCommand = async (sock, m, args) => {
+    // Fast validation
+    if (!m || !m.key || !m.key.remoteJid) {
+        return;
+    }
+
+    const chatId = m.key.remoteJid;
+    const sender = m.key.participant || m.key.remoteJid;
+    
     try {
-        // Validate message object
-        if (!m || !m.key || !m.key.remoteJid) {
-            console.error("Error: Invalid message object");
-            return;
-        }
+        let target = sender; // Default: sender's own picture
 
-        const chatId = m.key.remoteJid;
-        const sender = m.key.participant || m.key.remoteJid;
-
-        // Determine target user
-        let target = sender; // Default to sender
-
-        // Check for mentions in the message
-        const mentionedJids = m.message?.extendedTextMessage?.contextInfo?.mentionedJid;
-        if (mentionedJids && mentionedJids.length > 0) {
-            target = mentionedJids[0];
-        }
-
-        // Check for quoted message (reply to someone)
-        const quotedParticipant = m.message?.extendedTextMessage?.contextInfo?.participant;
-        if (quotedParticipant) {
-            target = quotedParticipant;
-        }
-
-        // Check for phone number in args
+        // Priority 1: Phone number in args
         if (args && args.length > 0 && args[0]) {
             const phoneNumber = args[0].replace(/[^0-9]/g, '');
-            if (phoneNumber) {
+            if (phoneNumber && phoneNumber.length >= 9) {
                 target = phoneNumber + '@s.whatsapp.net';
             }
         }
-
-        // Validate target format
-        if (!target || !target.includes('@s.whatsapp.net')) {
-            return await sock.sendMessage(chatId, {
-                text: '❌ *Invalid target!*\n\nUsage: `.getpp` (your own)\n`.getpp @mention`\n`.getpp 255xxxxxxxxx`'
-            }, { quoted: m });
+        // Priority 2: Mentioned users
+        else if (m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0]) {
+            target = m.message.extendedTextMessage.contextInfo.mentionedJid[0];
+        }
+        // Priority 3: Quoted/replied to message
+        else if (m.message?.extendedTextMessage?.contextInfo?.participant) {
+            target = m.message.extendedTextMessage.contextInfo.participant;
         }
 
-        // Attempt to get profile picture URL
+        // Fetch profile picture URL with timeout
         let profileUrl;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+
         try {
-            profileUrl = await sock.profilePictureUrl(target, 'image');
+            profileUrl = await Promise.race([
+                sock.profilePictureUrl(target, 'image'),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 7500))
+            ]);
+            clearTimeout(timeout);
         } catch (error) {
-            console.error('Profile picture fetch error:', error);
-            return await sock.sendMessage(chatId, {
-                text: `❌ *Profile picture not available*\n\nThe user may have privacy settings enabled or no profile picture set.`
-            }, { quoted: m });
+            clearTimeout(timeout);
+            // Silent fail - user likely has privacy enabled
+            await sock.sendMessage(chatId, {
+                text: '❌ Profile picture not available\n_Privacy enabled or no picture set_'
+            }, { quoted: m }).catch(() => {});
+            return;
         }
 
-        // Download the image using axios with proper headers
+        if (!profileUrl) {
+            await sock.sendMessage(chatId, {
+                text: '❌ Could not fetch profile picture'
+            }, { quoted: m }).catch(() => {});
+            return;
+        }
+
+        // Download with aggressive timeout
         const response = await axios.get(profileUrl, {
             responseType: 'arraybuffer',
+            timeout: 8000,
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            },
-            timeout: 30000 // 30 second timeout
-        });
+                'User-Agent': 'Mozilla/5.0'
+            }
+        }).catch(() => null);
 
-        // Validate response
-        if (!response.data || response.data.length === 0) {
-            return await sock.sendMessage(chatId, {
-                text: '❌ *Failed to download profile picture*'
-            }, { quoted: m });
+        if (!response?.data || response.data.length === 0) {
+            await sock.sendMessage(chatId, {
+                text: '❌ Failed to download picture'
+            }, { quoted: m }).catch(() => {});
+            return;
         }
 
-        // Get target info for caption
-        const targetNumber = target.split('@')[0];
+        // Send immediately without extra processing
+        const targetNum = target.split('@')[0];
         const isOwn = target === sender;
 
-        // Send the profile picture
         await sock.sendMessage(chatId, {
             image: Buffer.from(response.data),
-            caption: `✅ *Profile Picture ${isOwn ? '(Yours)' : ''}*\n\n👤 *User:* @${targetNumber}\n📏 *Size:* ${(response.data.length / 1024).toFixed(2)} KB`,
-            mentions: [target]
-        }, { quoted: m });
+            caption: `✅ *Profile Picture*${isOwn ? ' (Yours)' : ''}\n👤 @${targetNum}`
+        }, { quoted: m }).catch(() => {});
 
     } catch (error) {
-        console.error('GetPP Command Error:', error);
-
-        // Send error message
+        // Fail silently or send minimal error
         try {
-            await sock.sendMessage(m.key.remoteJid, {
-                text: `❌ *Error occurred while fetching profile picture*\n\n${error.message || 'Unknown error'}`
-            }, { quoted: m });
-        } catch (sendError) {
-            console.error('Failed to send error message:', sendError);
+            await sock.sendMessage(chatId, {
+                text: '❌ Error getting picture'
+            }, { quoted: m }).catch(() => {});
+        } catch (e) {
+            // Silent fail
         }
     }
 };
@@ -103,4 +102,4 @@ const getProfilePictureCommand = async (sock, m, args) => {
 module.exports = getProfilePictureCommand;
 module.exports.name = 'getpp';
 module.exports.category = 'UTILITY';
-module.exports.description = 'Get profile picture of yourself or mentioned user';
+module.exports.description = 'Get profile picture - fast & instant';
