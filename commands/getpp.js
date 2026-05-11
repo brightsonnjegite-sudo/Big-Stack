@@ -1,105 +1,86 @@
 const axios = require('axios');
 
 /**
- * Get profile picture command - FAST VERSION
- * Works with text replies, mentions, and phone numbers
- * @param {Object} sock - Baileys socket instance
- * @param {Object} m - Message object  
- * @param {Array} args - Command arguments
+ * Get Profile Picture Command - PRO VERSION
+ * Inatumia Baileys + Fallback ya Web Scraping (Toolzin style)
  */
 const getProfilePictureCommand = async (sock, m, args) => {
-    // Fast validation
-    if (!m || !m.key || !m.key.remoteJid) {
-        return;
-    }
+    if (!m || !m.key || !m.key.remoteJid) return;
 
     const chatId = m.key.remoteJid;
     const sender = m.key.participant || m.key.remoteJid;
-    
-    try {
-        let target = sender; // Default: sender's own picture
 
-        // Priority 1: Phone number in args
-        if (args && args.length > 0 && args[0]) {
+    try {
+        let target = sender;
+
+        // 1. Pata target (kama ni namba, mention, au reply)
+        if (args && args.length > 0) {
             const phoneNumber = args[0].replace(/[^0-9]/g, '');
-            if (phoneNumber && phoneNumber.length >= 9) {
+            if (phoneNumber.length >= 9) {
                 target = phoneNumber + '@s.whatsapp.net';
             }
-        }
-        // Priority 2: Mentioned users
-        else if (m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0]) {
+        } else if (m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0]) {
             target = m.message.extendedTextMessage.contextInfo.mentionedJid[0];
-        }
-        // Priority 3: Quoted/replied to message
-        else if (m.message?.extendedTextMessage?.contextInfo?.participant) {
+        } else if (m.message?.extendedTextMessage?.contextInfo?.participant) {
             target = m.message.extendedTextMessage.contextInfo.participant;
         }
 
-        // Fetch profile picture URL with timeout
-        let profileUrl;
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+        const targetNum = target.split('@')[0];
+        let profileUrl = null;
 
+        // --- NJIA YA 1: Baileys Official ---
         try {
-            profileUrl = await Promise.race([
-                sock.profilePictureUrl(target, 'image'),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 7500))
-            ]);
-            clearTimeout(timeout);
-        } catch (error) {
-            clearTimeout(timeout);
-            // Silent fail - user likely has privacy enabled
-            await sock.sendMessage(chatId, {
-                text: '❌ Profile picture not available\n_Privacy enabled or no picture set_'
-            }, { quoted: m }).catch(() => {});
-            return;
+            profileUrl = await sock.profilePictureUrl(target, 'image');
+        } catch (e) {
+            // --- NJIA YA 2: Web Scraping (Mbinu ya Toolzin) ---
+            // Kama privacy ya mtumiaji ni "Everyone", picha inaonekana wa.me
+            try {
+                const waRes = await axios.get(`https://wa.me/${targetNum}`, {
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                    timeout: 5000
+                });
+
+                if (waRes.data.includes('og:image')) {
+                    const match = waRes.data.match(/property="og:image" content="([^"]+)"/);
+                    if (match && match[1]) {
+                        profileUrl = match[1].replace(/&amp;/g, '&');
+                    }
+                }
+            } catch (scrapingError) {
+                profileUrl = null;
+            }
         }
 
-        if (!profileUrl) {
-            await sock.sendMessage(chatId, {
-                text: '❌ Could not fetch profile picture'
-            }, { quoted: m }).catch(() => {});
-            return;
+        // Kama picha haijapatikana kote
+        if (!profileUrl || profileUrl.includes('default-user')) {
+            return await sock.sendMessage(chatId, {
+                text: `❌ *Imeshindikana!*\n\nInawezekana namba *${targetNum}* imeweka privacy ya picha (Nobody/Contacts) au haina picha kabisa.`
+            }, { quoted: m });
         }
 
-        // Download with aggressive timeout
+        // 2. Download picha kwa kutumia Axios
         const response = await axios.get(profileUrl, {
             responseType: 'arraybuffer',
-            timeout: 8000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0'
-            }
-        }).catch(() => null);
+            timeout: 10000,
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
 
-        if (!response?.data || response.data.length === 0) {
-            await sock.sendMessage(chatId, {
-                text: '❌ Failed to download picture'
-            }, { quoted: m }).catch(() => {});
-            return;
-        }
+        if (!response.data) throw new Error('Data tupu');
 
-        // Send immediately without extra processing
-        const targetNum = target.split('@')[0];
-        const isOwn = target === sender;
-
+        // 3. Tuma picha kwa mtumiaji
         await sock.sendMessage(chatId, {
             image: Buffer.from(response.data),
-            caption: `✅ *Profile Picture*${isOwn ? ' (Yours)' : ''}\n👤 @${targetNum}`
-        }, { quoted: m }).catch(() => {});
+            caption: `✅ *Profile Picture*\n\n👤 *User:* @${targetNum}\n🔗 *Link:* ${profileUrl.substring(0, 30)}...`,
+            mentions: [target]
+        }, { quoted: m });
 
     } catch (error) {
-        // Fail silently or send minimal error
-        try {
-            await sock.sendMessage(chatId, {
-                text: '❌ Error getting picture'
-            }, { quoted: m }).catch(() => {});
-        } catch (e) {
-            // Silent fail
-        }
+        console.error('Error getpp:', error);
+        await sock.sendMessage(chatId, { text: '❌ Hitilafu imetokea wakati wa kuchukua picha.' }, { quoted: m });
     }
 };
 
 module.exports = getProfilePictureCommand;
 module.exports.name = 'getpp';
 module.exports.category = 'UTILITY';
-module.exports.description = 'Get profile picture - fast & instant';
+module.exports.description = 'Chukua picha ya wasifu ya mtu yeyote (DP)';
