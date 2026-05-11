@@ -66,7 +66,6 @@ const { demoteCommand } = require('./commands/demote');
 const muteCommand = require('./commands/mute');
 const unmuteCommand = require('./commands/unmute');
 const stickerCommand = require('./commands/sticker');
-const gpstatusCommand = require('./commands/gpstatus');
 const isAdmin = require('./lib/isAdmin');
 const warnCommand = require('./commands/warn');
 const warningsCommand = require('./commands/warnings');
@@ -674,10 +673,6 @@ async function handleMessages(sock, messageUpdate, printLog) {
                 await stickerCommand(sock, chatId, message);
                 commandExecuted = true;
                 break;
-            case userMessage === '.gpstatus':
-                await gpstatusCommand(sock, chatId, message);
-                commandExecuted = true;
-                break;
             case userMessage.startsWith('.warnings'):
                 const mentionedJidListWarnings = message.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
                 await warningsCommand(sock, chatId, mentionedJidListWarnings);
@@ -1085,10 +1080,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
                 await setProfilePicture(sock, chatId, message);
                 break;
             case userMessage === '.getpp':
-                {
-                    const args = userMessage.split(' ').slice(1);
-                    await getProfilePicture(sock, message, args);
-                }
+                await getProfilePicture(sock, chatId, message);
                 break;
             case userMessage.startsWith('.setgdesc'):
                 {
@@ -1200,10 +1192,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
                 await gdriveCommand(sock, chatId, message);
                 break;
             case userMessage.startsWith('.getcode'):
-                {
-                    const args = userMessage.split(' ').slice(1);
-                    await getcodeCommand(sock, chatId, message, args);
-                }
+                await getcodeCommand(sock, chatId, message);
                 break;
             case userMessage.startsWith('.getlink'):
                 await getlinkCommand(sock, chatId, message);
