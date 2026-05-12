@@ -102,6 +102,8 @@ const blurCommand = require('./commands/img-blur');
 // github command removed
 const { handleAntiBadwordCommand, handleBadwordDetection } = require('./lib/antibadword');
 const antibadwordCommand = require('./commands/antibadword');
+const { handleAntiBotCommand, handleBotDetection } = require('./lib/antibot');
+const antibotCommand = require('./commands/antibot');
 
 // antileft command removed
 
@@ -386,11 +388,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
         if (isGroup) {
             if (userMessage) {
                 await handleBadwordDetection(sock, chatId, message, userMessage, senderId);
-            }
-            // Antilink checks message text internally, so run it even if userMessage is empty
-            await Antilink(message, sock);
-        }
-
+        await handleBotDetection(sock, chatId, message, userMessage, senderId);
         // PM blocker: block non-owner DMs when enabled (do not ban)
         // Allow the owner or sudo users to bypass the PM blocker
         if (!isGroup && !message.key.fromMe && !senderIsOwnerOrSudo) {
@@ -538,7 +536,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
         }
 
         // List of admin commands
-        const adminCommands = ['.mute', '.unmute', '.ban', '.unban', '.promote', '.demote', '.kick', '.tagall', '.tagnotadmin', '.hidetag', '.antilink', '.antitag', '.setgdesc', '.setgname', '.setgpp'];
+        const adminCommands = ['.mute', '.unmute', '.ban', '.unban', '.promote', '.demote', '.kick', '.tagall', '.tagnotadmin', '.hidetag', '.antilink', '.antitag', '.antibot', '.setgdesc', '.setgname', '.setgpp'];
         const isAdminCommand = adminCommands.some(cmd => userMessage.startsWith(cmd));
 
         // List of owner commands
@@ -961,6 +959,23 @@ async function handleMessages(sock, messageUpdate, printLog) {
                 }
 
                 await antibadwordCommand(sock, chatId, message, senderId, isSenderAdmin);
+                break;
+            case userMessage.startsWith('.antibot'):
+                if (!isGroup) {
+                    await sock.sendMessage(chatId, { text: 'This command can only be used in groups.' }, { quoted: message });
+                    return;
+                }
+
+                const adminStatusBot = await isAdmin(sock, chatId, senderId);
+                isSenderAdmin = adminStatusBot.isSenderAdmin;
+                isBotAdmin = adminStatusBot.isBotAdmin;
+
+                if (!isBotAdmin) {
+                    await sock.sendMessage(chatId, { text: '*Bot must be admin to use this feature*' }, { quoted: message });
+                    return;
+                }
+
+                await antibotCommand(sock, chatId, message, senderId, isSenderAdmin);
                 break;
             // chatbot/.islam commands removed
             case userMessage.startsWith('.take') || userMessage.startsWith('.steal'):
