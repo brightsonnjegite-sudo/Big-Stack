@@ -81,7 +81,6 @@ const { handleAntitagCommand, handleTagDetection } = require('./commands/antitag
 // (removed antileft feature) in-memory set no longer used
 const { Antilink } = require('./lib/antilink');
 const { handleMentionDetection, mentionToggleCommand, setMentionCommand, groupMentionToggleCommand } = require('./commands/mention');
-const { handleAntiStatusMention, groupAntiStatusToggleCommand } = require('./commands/antistatusmention');
 const tagCommand = require('./commands/tag');
 const tagNotAdminCommand = require('./commands/tagnotadmin');
 const hideTagCommand = require('./commands/hidetag');
@@ -102,8 +101,6 @@ const blurCommand = require('./commands/img-blur');
 // github command removed
 const { handleAntiBadwordCommand, handleBadwordDetection } = require('./lib/antibadword');
 const antibadwordCommand = require('./commands/antibadword');
-const { handleAntiBotCommand, handleBotDetection } = require('./lib/antibot');
-const antibotCommand = require('./commands/antibot');
 
 // antileft command removed
 
@@ -126,7 +123,6 @@ const textmakerCommand = require('./commands/textmaker');
 const { handleAntideleteCommand, handleMessageRevocation, storeMessage } = require('./commands/antidelete');
 const clearTmpCommand = require('./commands/cleartmp');
 const setProfilePicture = require('./commands/setpp');
-const getProfilePicture = require('./commands/getpp');
 const { setGroupDescription, setGroupName, setGroupPhoto } = require('./commands/groupmanage');
 const instagramCommand = require('./commands/instagram');
 const facebookCommand = require('./commands/facebook');
@@ -151,7 +147,6 @@ const { anticallCommand, readState: readAnticallState } = require('./commands/an
 const { pinCommand, verifyPinCommand, checkPinVerification } = require('./commands/pin');
 const { pmblockerCommand, readState: readPmBlockerState } = require('./commands/pmblocker');
 const settingsCommand = require('./commands/settings');
-const ghostCommand = require('./commands/ghost');
 const newgroupCommand = require('./commands/newgroup');
 const gdriveCommand = require('./commands/gdrive');
 const getcodeCommand = require('./commands/getcode');
@@ -388,7 +383,6 @@ async function handleMessages(sock, messageUpdate, printLog) {
         if (isGroup) {
             if (userMessage) {
                 await handleBadwordDetection(sock, chatId, message, userMessage, senderId);
-                await handleBotDetection(sock, chatId, message, userMessage, senderId);
             }
             // Antilink checks message text internally, so run it even if userMessage is empty
             await Antilink(message, sock);
@@ -520,7 +514,6 @@ async function handleMessages(sock, messageUpdate, printLog) {
                     // Always run moderation features (antitag) regardless of mode
                     await handleTagDetection(sock, chatId, message, senderId);
                     await handleMentionDetection(sock, chatId, message);
-                    if (typeof handleAntiStatusMention === 'function') await handleAntiStatusMention(sock, chatId, message);
                 }
 
                 // Chatbot handling: try to respond in groups or private chats if enabled
@@ -541,7 +534,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
         }
 
         // List of admin commands
-        const adminCommands = ['.mute', '.unmute', '.ban', '.unban', '.promote', '.demote', '.kick', '.tagall', '.tagnotadmin', '.hidetag', '.antilink', '.antitag', '.antibot', '.setgdesc', '.setgname', '.setgpp'];
+        const adminCommands = ['.mute', '.unmute', '.ban', '.unban', '.promote', '.demote', '.kick', '.tagall', '.tagnotadmin', '.hidetag', '.antilink', '.antitag', '.setgdesc', '.setgname', '.setgpp'];
         const isAdminCommand = adminCommands.some(cmd => userMessage.startsWith(cmd));
 
         // List of owner commands
@@ -913,12 +906,6 @@ async function handleMessages(sock, messageUpdate, printLog) {
                     await groupMentionToggleCommand(sock, chatId, message, args);
                 }
                 break;
-            case userMessage.startsWith('.antistatusmention ') || userMessage.startsWith('.astatus '):
-                {
-                    const args = userMessage.split(' ').slice(1).join(' ');
-                    await groupAntiStatusToggleCommand(sock, chatId, message, args);
-                }
-                break;
             case userMessage === '.setmention':
                 {
                     const isOwner = message.key.fromMe || senderIsSudo;
@@ -964,23 +951,6 @@ async function handleMessages(sock, messageUpdate, printLog) {
                 }
 
                 await antibadwordCommand(sock, chatId, message, senderId, isSenderAdmin);
-                break;
-            case userMessage.startsWith('.antibot'):
-                if (!isGroup) {
-                    await sock.sendMessage(chatId, { text: 'This command can only be used in groups.' }, { quoted: message });
-                    return;
-                }
-
-                const adminStatusBot = await isAdmin(sock, chatId, senderId);
-                isSenderAdmin = adminStatusBot.isSenderAdmin;
-                isBotAdmin = adminStatusBot.isBotAdmin;
-
-                if (!isBotAdmin) {
-                    await sock.sendMessage(chatId, { text: '*Bot must be admin to use this feature*' }, { quoted: message });
-                    return;
-                }
-
-                await antibotCommand(sock, chatId, message, senderId, isSenderAdmin);
                 break;
             // chatbot/.islam commands removed
             case userMessage.startsWith('.take') || userMessage.startsWith('.steal'):
@@ -1104,12 +1074,6 @@ async function handleMessages(sock, messageUpdate, printLog) {
             case userMessage === '.pp':
                 await setProfilePicture(sock, chatId, message);
                 break;
-            case userMessage === '.getpp':
-                {
-                    const args = userMessage.split(' ').slice(1);
-                    await getProfilePicture(sock, message, args);
-                }
-                break;
             case userMessage.startsWith('.setgdesc'):
                 {
                     const text = rawText.slice(9).trim();
@@ -1210,9 +1174,6 @@ async function handleMessages(sock, messageUpdate, printLog) {
                 commandExecuted = true;
                 break;
             // Additional command cases
-            case userMessage.startsWith('.ghost'):
-                await ghostCommand(sock, chatId, message);
-                break;
             case userMessage.startsWith('.newgroup'):
                 await newgroupCommand(sock, chatId, message);
                 break;
