@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
-// Ku-import gifted-btns kwa ajili ya kutengeneza button za kisasa za Baileys
+// Ku-import gifted-btns kwa ajili ya kutengeneza button za kisasa na rahisi
 const { sendButtons } = require('gifted-btns');
 
 // Paths za kuhifadhi data
@@ -54,17 +54,20 @@ function extractText(m) {
     try {
         if (!m || !m.message) return '';
         const msg = m.message;
-        // Inasoma text za kawaida na zile zinazotokana na kubonyeza button za kisasa
+        
+        // Inasoma text za kawaida, button za kisasa (gifted-btns), na button za kizamani (buttonsResponseMessage)
         return (
             msg.conversation || 
             msg.extendedTextMessage?.text || 
             msg.imageMessage?.caption || 
             msg.videoMessage?.caption || 
             msg.buttonsResponseMessage?.selectedButtonId || 
+            msg.buttonsResponseMessage?.selectedDisplayText ||
             msg.templateButtonReplyMessage?.selectedId ||
+            msg.listResponseMessage?.singleSelectReply?.selectedRowId ||
             msg.interactiveResponseMessage?.nativeFlowResponseMessage?.name ||
-            msg.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson ? 
-                JSON.parse(msg.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson).id : '' ||
+            (msg.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson ? 
+                JSON.parse(msg.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson).id : '') ||
             ''
         ).trim();
     } catch (e) { return ''; }
@@ -76,6 +79,7 @@ async function handleChatbotMessage(sock, chatId, m, userText = null) {
         if (!chatId || m.key?.fromMe) return;
 
         const text = userText || extractText(m);
+        // Puuza kama ni command au text tupu
         if (!text || text.startsWith('.') || text.startsWith('!') || text.startsWith('/')) return; 
 
         const userName = m.pushName || 'Mshkaji'; 
@@ -100,25 +104,40 @@ async function handleChatbotMessage(sock, chatId, m, userText = null) {
 
         try { await sock.sendPresenceUpdate('composing', chatId); } catch (e) {}
 
-        // --- PROMPT YA MAELEKEZO KWA AI ---
+        // --- FULLY OPTIMIZED PROMPT (IDENTITY, VIBE & BUTTON RULES) ---
         const systemPrompt = `[ROLE]: Wewe ni MICKEY GLITCH V3, genius chatbot uliyetengenezwa na Mickdadi Hamza (Quantum Code Dev).
 [TARGET]: Unaongea na "${userName}".
+
 [STRICT RULES]:
-1. IDENTITY: Ukiulizwa wewe ni nani, kataa kuwa ChatGPT au OpenAI. Wewe ni Mickey Glitch.
-2. PERSONALITY: Ongea kishkaji sana (Tanzanian Slang). Tumia maneno kama 'Oya', 'Niaje', 'Mwanangu'.
-3. CONTEXT: Mtaje "${userName}" anapokusalimia au unapoona inafaa ili kuleta vibe.
-4. BREVITY: Majibu yawe mafupi, straight to the point, na yenye michapo.
-5. OWNER: Masuala ya kitalaamu mwelekeze kwa Mickdadi (255612130873).
-6. BUTTON GENERATION: Kama unatoa machaguo (options) kwa mtumiaji, weka button mwisho wa jibu lako kwa muundo huu maalum:
-[BUTTON: Maandishi ya Button | id_ya_button]
-Mfano ukitoa menu au options:
-Oya mwanangu, chagua kitu hapa chini:
-[BUTTON: Msaada wa Menu | .menu]
-[BUTTON: Ongea na Boss | .owner]
-Usiweke button zaidi ya tatu (3).`;
+1. IDENTITY: Ukiulizwa wewe ni nani, kataa kabisa kuwa ChatGPT au OpenAI. Wewe ni Mickey Glitch pekee!
+2. PERSONALITY: Ongea kishkaji sana kwa kutumia Sheng/Slang ya Tanzania. Tumia maneno kama 'Oya', 'Niaje', 'Mwanangu', 'Inakuwaje', 'Wadao'.
+3. CONTEXT: Mtaje "${userName}" mara kwa mara hasa akisalimia au ukitaka kusisitiza jambo ili kuweka vibe la kirafiki.
+4. BREVITY: Majibu yako yawe mafupi, straight to the point, changamka na weka michapo ya kijanja.
+5. OWNER: Masuala yote makubwa ya kitalaamu mwelekeze kwa mtaalamu Mickdadi (255612130873).
+
+[BUTTON GENERATION RULES]:
+Wewe una uwezo wa kutengeneza button za kubonyeza kwenye WhatsApp ya mtumiaji. Kila unapoona inafaa kutoa machaguo (options), au kumkaribisha mtu, LAZIMA uandike button mwisho wa jibu lako kwa muundo huu maalum:
+[BUTTON: Maandishi ya Kwenye Button | id_au_command]
+
+MISINGI YA BUTTON:
+- Usizidi button tatu (3) kwa jibu moja.
+- ID ya button inaweza kuwa command kama (.menu, .owner) au neno fupi la kawaida (msaada, mambo).
+
+MIFANO YA JINSI YA KUTENGENEZA BUTTON (Iige kabisa):
+Mfano 1 (Mtu akisalimia):
+"Oya niaje ${userName}! Inakuwaje mwanangu? Karibu kwenye Mickey Glitch V3. Nicheki hapa chini:
+[BUTTON: Fungua Menu | .menu]
+[BUTTON: Ongea na Boss | .owner]"
+
+Mfano 2 (Mtu akiomba msaada au kuuliza maswali):
+"Inatosha mwanangu, mambo ya system yamenyooka. Unataka msaada gani sasa hivi? Chagua hapa:
+[BUTTON: Menu Kuu | .menu]
+[BUTTON: Contact Mickdadi | .owner]
+[BUTTON: Kimbia Group | .kick]"`;
 
         const fullPrompt = `INSTRUCTIONS:\n${systemPrompt}\n\n---\nCHAT_HISTORY:\n${history}\n\n---\nUSER: ${userName}\nINPUT: ${text}\nMICKEY:`;
 
+        // API Call
         const apiUrl = `https://api.yupra.my.id/api/ai/gpt5?text=${encodeURIComponent(fullPrompt)}`;
         const fetchRes = await fetch(apiUrl);
         const res = await fetchRes.json();
@@ -127,13 +146,15 @@ Usiweke button zaidi ya tatu (3).`;
 
         if (!reply) return;
 
+        // Auto-cleaner ya majina ya AI nyingine
         reply = reply.replace(/Microsoft|Copilot|AI Assistant|OpenAI|GPT-3|GPT-4|ChatGPT/gi, "Mickey Glitch");
 
-        // --- REGEX YA KUCHUJA BUTTONS KUTOKA KWA AI ---
+        // --- REGEX YA KUCHUJA BUTTONS ---
         const buttonRegex = /\[BUTTON:\s*([^|]+)\s*\|\s*([^\]]+)\]/g;
         let match;
         let extractedButtons = [];
 
+        // Kusanya button zote zilizoandikwa na AI
         while ((match = buttonRegex.exec(reply)) !== null) {
             extractedButtons.push({
                 displayText: match[1].trim(),
@@ -141,18 +162,20 @@ Usiweke button zaidi ya tatu (3).`;
             });
         }
 
-        // Kusafisha jibu ili lisionyeshe zile code za [BUTTON: ...] kwenye chat
+        // Safisha jibu ili visionekane vile vi-code vya [BUTTON: ...] kwenye chat ya mtumiaji
         let cleanReply = reply.replace(buttonRegex, '').trim();
 
-        // Hifadhi jibu safi kwenye memory
+        // Hifadhi jibu lililosafishwa kwenye memory
         memory[chatId].chats.push({ role: "assistant", content: cleanReply });
         saveMemory(memory);
 
-        // --- TUMA MESSAGE KWA KUTUMIA GIFTED-BTNS KAMA KUNA BUTTONS ---
+        // --- TUMA MESSAGE KULINGANA NA KAMA KUNA BUTTONS ---
         if (extractedButtons.length > 0) {
-            // sendButtons inahitaji: sock, chatId, text, footer, buttonsArray, quoted
-            await sendButtons(sock, chatId, cleanReply, "Mickey Glitch V3", extractedButtons, m);
+            // Inatuma kwa npm ya gifted-btns
+            // Muundo: sendButtons(sock, chatId, text, footer, buttonsArray, quoted)
+            await sendButtons(sock, chatId, cleanReply, "🤖 Mickey Glitch V3", extractedButtons, m);
         } else {
+            // Kama AI haikuweka button, inatuma kama text ya kawaida
             await sock.sendMessage(chatId, { text: cleanReply }, { quoted: m });
         }
 
