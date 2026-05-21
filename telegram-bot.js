@@ -1,20 +1,94 @@
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
-const yts = require('yt-search'); // Imewekwa kwa ajili ya kusaka YouTube
+const yts = require('yt-search'); 
 const settings = require('./settings');
 
 const TELEGRAM_DATA_DIR = path.join(__dirname, 'data');
 const TELEGRAM_DATA_FILE = path.join(TELEGRAM_DATA_DIR, 'telegramPairs.json');
 const TELEGRAM_BASE_URL = (token) => `https://api.telegram.org/bot${token}`;
 
+const AXIOS_DEFAULTS = {
+    timeout: 30000,
+    headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*'
+    }
+};
+
+// Exponential backoff retry mechanism
+async function tryRequest(getter, attempts = 2) {
+    let lastErr;
+    for (let i = 1; i <= attempts; i++) {
+        try { return await getter(); } 
+        catch (err) { lastErr = err; if (i < attempts) await new Promise(r => setTimeout(r, 1000 * i)); }
+    }
+    throw lastErr;
+}
+
+// Get MP3/Audio Link na Multi-API JSON Fallback
+async function getYoutubeMp3(ytUrl) {
+    const apis = [
+        async () => {
+            const res = await axios.get(`https://nayan-video-downloader.vercel.app/youtube?url=${encodeURIComponent(ytUrl)}`, AXIOS_DEFAULTS);
+            const formats = res.data?.data?.data?.formats || [];
+            const found = formats.find(f => f.type === 'audio' || f.mimeType?.includes('audio')) || formats[formats.length - 1];
+            if (found?.url) return found.url;
+            throw new Error();
+        },
+        async () => {
+            const res = await axios.get(`https://apiskeith.top/download/audio?url=${encodeURIComponent(ytUrl)}`, AXIOS_DEFAULTS);
+            return res.data?.result?.url || res.data?.result?.download || res.data?.result || res.data?.url || res.data?.download || res.data?.audio;
+        },
+        async () => {
+            const res = await axios.get(`https://eliteprotech-apis.zone.id/ytmp3?url=${encodeURIComponent(ytUrl)}`, AXIOS_DEFAULTS);
+            return res.data?.result?.url || res.data?.result?.download || res.data?.url || res.data?.download;
+        }
+    ];
+
+    for (const api of apis) {
+        try {
+            const downloadUrl = await tryRequest(api);
+            if (downloadUrl && typeof downloadUrl === 'string') return downloadUrl;
+        } catch { continue; }
+    }
+    throw new Error('API zote za MP3 zimefeli.');
+}
+
+// Get MP4/Video Link na Multi-API JSON Fallback
+async function getYoutubeMp4(ytUrl) {
+    const apis = [
+        async () => {
+            const res = await axios.get(`https://nayan-video-downloader.vercel.app/youtube?url=${encodeURIComponent(ytUrl)}`, AXIOS_DEFAULTS);
+            const formats = res.data?.data?.data?.formats || [];
+            const found = formats.find(f => f.type === 'video_with_audio' && f.ext === 'mp4') || formats.find(f => f.ext === 'mp4') || formats[0];
+            if (found?.url) return found.url;
+            throw new Error();
+        },
+        async () => {
+            const res = await axios.get(`https://apiskeith.top/download/mp4?url=${encodeURIComponent(ytUrl)}`, AXIOS_DEFAULTS);
+            return res.data?.result?.url || res.data?.result?.download || res.data?.result || res.data?.url || res.data?.download || res.data?.video;
+        },
+        async () => {
+            const res = await axios.get(`https://eliteprotech-apis.zone.id/ytmp4?url=${encodeURIComponent(ytUrl)}`, AXIOS_DEFAULTS);
+            return res.data?.result?.url || res.data?.result?.download || res.data?.url || res.data?.download;
+        }
+    ];
+
+    for (const api of apis) {
+        try {
+            const downloadUrl = await tryRequest(api);
+            if (downloadUrl && typeof downloadUrl === 'string') return downloadUrl;
+        } catch { continue; }
+    }
+    throw new Error('API zote za MP4 zimefeli.');
+}
+
 async function removeWebhookIfSet(token) {
   try {
     const resp = await axios.post(`${TELEGRAM_BASE_URL(token)}/deleteWebhook`);
     return resp?.data?.ok || false;
-  } catch (err) {
-    return false;
-  }
+  } catch (err) { return false; }
 }
 
 function ensureTelegramDataFile() {
@@ -28,9 +102,7 @@ function loadAllowedChats() {
     const raw = fs.readFileSync(TELEGRAM_DATA_FILE, 'utf8');
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.map(id => String(id)) : [];
-  } catch (error) {
-    return [];
-  }
+  } catch (error) { return []; }
 }
 
 function saveAllowedChats(chats) {
@@ -38,9 +110,7 @@ function saveAllowedChats(chats) {
   fs.writeFileSync(TELEGRAM_DATA_FILE, JSON.stringify(unique, null, 2), 'utf8');
 }
 
-function isChatAllowed(chatId) {
-  return loadAllowedChats().includes(String(chatId));
-}
+function isChatAllowed(chatId) { return loadAllowedChats().includes(String(chatId)); }
 
 function addAllowedChat(chatId) {
   const allowed = loadAllowedChats();
@@ -89,15 +159,18 @@ function isTelegramAuthorized(chatId) {
   return false;
 }
 
-// FIX: Logic ya kupair imesafishwa na kurahisishwa ili isikatae ovyo
+// FIXED: Yeyote sasa anaweza kutumia command ya pair mradi ana code sahihi
 function canPair(chatId, code) {
   const inputCode = String(code || '').trim();
   const ownerId = String(settings.telegram?.ownerId || '').trim();
   const ownerNumber = String(settings.ownerNumber || '').replace(/\D/g, '').trim();
   const pairCode = String(settings.telegram?.pairCode || '').trim();
 
+  // Kama ni owner chat, pair moja kwa moja
   if (ownerId && String(chatId) === ownerId) return true;
   if (!inputCode) return false;
+  
+  // Mtu yeyote akipatia pairCode au ownerNumber, anaruhusiwa
   if (pairCode && inputCode === pairCode) return true;
   if (ownerNumber && inputCode === ownerNumber) return true;
 
@@ -120,7 +193,6 @@ async function sendTelegramMessage(chatId, text, extra = {}) {
   }
 }
 
-// Helper ya kutuma Audio/Video faili
 async function sendTelegramMedia(chatId, type, url, caption = '') {
   const token = settings.telegram?.botToken?.trim();
   if (!token || !chatId) return;
@@ -134,7 +206,7 @@ async function sendTelegramMedia(chatId, type, url, caption = '') {
     });
   } catch (error) {
     console.error(`Telegram ${endpoint} failed:`, error?.response?.data || error.message);
-    await sendTelegramMessage(chatId, `❌ Kushindwa kutuma ${type}. Kiungo kimezuiliwa au ni kikubwa sana.`);
+    await sendTelegramMessage(chatId, `❌ Kushindwa kutuma ${type}. Kiungo kimezuiliwa, kimeharibika au faili ni kubwa sana.`);
   }
 }
 
@@ -171,9 +243,7 @@ async function handleUpdateCommand(chatId, isActiveOwner) {
       fs.writeFileSync(__filename, response.data, 'utf8');
       await sendTelegramMessage(chatId, '✅ *Msimbo umesasishwa kwa mafanikio!* Inajiwasha upya...');
       setTimeout(() => { process.exit(0); }, 2000);
-    } else {
-      throw new Error('Data haikupatikana');
-    }
+    } else { throw new Error('Data haikupatikana'); }
   } catch (error) {
     await sendTelegramMessage(chatId, `❌ *Mchakato umefeli:* ${error.message}`);
   }
@@ -186,7 +256,7 @@ async function handleUpdate(update) {
   const chatId = message.chat?.id;
   const sender = message.from;
   const rawText = String(message.text || '').trim();
-  
+
   if (!rawText.startsWith('/') && !rawText.startsWith('.')) return;
 
   const cleanText = rawText.substring(1);
@@ -209,7 +279,7 @@ async function handleUpdate(update) {
     }
     const code = args[0] || '';
     if (!canPair(chatId, code)) {
-      return sendTelegramMessage(chatId, '❌ Pairing imekataa. Tumia nambari sahihi ya pairing au weka telegram.ownerId sahihi kwenye settings.js');
+      return sendTelegramMessage(chatId, '❌ Pairing imekataa. Tumia code au namba sahihi ya mmiliki.');
     }
     addAllowedChat(chatId);
     return sendTelegramMessage(chatId, '✅ Bot imepairishwa kikamilifu kwenye chat hii! Tumia /menu kuanza.');
@@ -227,73 +297,60 @@ async function handleUpdate(update) {
   }
 
   if (!allowed) {
-    return sendTelegramMessage(chatId, '⚠️ Chat hii haijapairishwa bado. Andika `/pair <namba>` ili kuitumia.');
+    return sendTelegramMessage(chatId, '⚠️ Chat hii haijapairishwa bado. Andika `/pair <code|namba>` ili kuitumia.');
   }
 
   switch (commandText) {
     case 'ping':
       return sendTelegramMessage(chatId, `🏓 Pong! Inaitikia vizuri kabisa.\n👤 Mtumiaji: ${sender?.username || sender?.first_name || 'Mgeni'}`);
-    
+
     case 'alive':
       return sendTelegramMessage(chatId, `✅ Mickey Glitch Bot iko Active.\n✨ Jukwaa: Telegram Engine\n⚙️ Usanidi: Safi`);
-    
+
     case 'owner':
       return sendTelegramMessage(chatId, `👤 Mmiliki: ${settings.botOwner || 'Mickey Developer'}\n📱 WhatsApp: https://wa.me/${settings.ownerNumber}`);
-    
+
     case 'stickertelegram':
       return handleStickerTelegram(chatId, args);
 
-    // FIX: Amri ya Play inayotumia yt-search na Nayan Downloader API
+    // FIXED: Play command ikiwa na JSON Fallback System thabiti
     case 'play': {
-      if (!fullArgs) return sendTelegramMessage(chatId, '⚠️ Tafadhali weka jina la wimbo! Mfano: `/play Alikiba Mahaba`');
+      if (!fullArgs) return sendTelegramMessage(chatId, '⚠️ Tafadhali weka jina la wimbo! Mfano: `/play Jux Enjoy`');
       await sendTelegramMessage(chatId, `🎵 *Inatafuta wimbo:* _${fullArgs}_...`);
-      
+
       try {
         const searchResult = await yts(fullArgs);
         const video = searchResult.videos[0];
         if (!video) return sendTelegramMessage(chatId, '❌ Wimbo haukupatikana YouTube.');
 
-        // Kupiga chombo cha Nayan Video Downloader API
-        const apiResponse = await axios.get(`https://nayan-video-downloader.vercel.app/youtube?url=${encodeURIComponent(video.url)}`);
-        const formats = apiResponse.data?.data?.data?.formats || [];
-        
-        // Kutafuta link ya audio (m4a, mp3 au aina yoyote ya audio)
-        const audioFormat = formats.find(f => f.type === 'audio' || f.mimeType?.includes('audio')) || formats[formats.length - 1];
-        
-        if (!audioFormat || !audioFormat.url) throw new Error('Audio link haikupatikana.');
+        await sendTelegramMessage(chatId, `⏳ *Inapakua Audio:* _${video.title}_...`);
+        const audioUrl = await getYoutubeMp3(video.url);
 
-        await sendTelegramMessage(chatId, `⏳ *Inapakua Audio:* _${video.title}_`);
-        await sendTelegramMedia(chatId, 'audio', audioFormat.url, `🎵 *Title:* ${video.title}\n🔗 *Link:* ${video.url}`);
+        await sendTelegramMedia(chatId, 'audio', audioUrl, `🎵 *Title:* ${video.title}\n🔗 *Link:* ${video.url}\n\n> *Mickey Developer* ⚡`);
       } catch (err) {
         console.error(err);
-        await sendTelegramMessage(chatId, '❌ Ilitokea error wakati wa kupakua audio hiyo kutoka kwenye API.');
+        await sendTelegramMessage(chatId, '❌ Ilitokea hitilafu wakati wa kupakua audio. API zote zimegoma au faili limezuiwa.');
       }
       return;
     }
 
-    // FIX: Amri ya Video inayotumia yt-search na Nayan Downloader API
+    // FIXED: Video command ikiwa na JSON Fallback System thabiti
     case 'video': {
-      if (!fullArgs) return sendTelegramMessage(chatId, '⚠️ Tafadhali weka jina la video! Mfano: `/video Harmonize Zanzibar`');
+      if (!fullArgs) return sendTelegramMessage(chatId, '⚠️ Tafadhali weka jina la video! Mfano: `/video Marioo Mi Amor`');
       await sendTelegramMessage(chatId, `📹 *Inatafuta video:* _${fullArgs}_...`);
-      
+
       try {
         const searchResult = await yts(fullArgs);
         const video = searchResult.videos[0];
         if (!video) return sendTelegramMessage(chatId, '❌ Video haikutumbukia kwenye utafutaji.');
 
-        const apiResponse = await axios.get(`https://nayan-video-downloader.vercel.app/youtube?url=${encodeURIComponent(video.url)}`);
-        const formats = apiResponse.data?.data?.data?.formats || [];
-        
-        // Kutafuta format inayofaa kwa video yenye audio (Kama 360p mp4)
-        const videoFormat = formats.find(f => f.type === 'video_with_audio' && f.ext === 'mp4') || formats.find(f => f.ext === 'mp4') || formats[0];
-        
-        if (!videoFormat || !videoFormat.url) throw new Error('Video link haikuchujika.');
+        await sendTelegramMessage(chatId, `⏳ *Inapakua Video:* _${video.title}_...`);
+        const videoUrl = await getYoutubeMp4(video.url);
 
-        await sendTelegramMessage(chatId, `⏳ *Inapakua Video:* _${video.title}_`);
-        await sendTelegramMedia(chatId, 'video', videoFormat.url, `📹 *Title:* ${video.title}\n🔗 *Link:* ${video.url}`);
+        await sendTelegramMedia(chatId, 'video', videoUrl, `📹 *Title:* ${video.title}\n🔗 *Link:* ${video.url}\n\n> *Mickey Developer* ⚡`);
       } catch (err) {
         console.error(err);
-        await sendTelegramMessage(chatId, '❌ Imefeli kupata link sahihi ya video kutoka kwenye seva yetu.');
+        await sendTelegramMessage(chatId, '❌ Imefeli kupata link ya video. Seva zote zimegoma au video ni kubwa mno kwa Telegram bot API.');
       }
       return;
     }
