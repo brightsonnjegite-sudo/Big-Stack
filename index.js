@@ -1,11 +1,12 @@
 /**
  * MICKEY GLITCH - A WhatsApp Bot
- * Clean & Optimized Version
+ * Clean, Optimized & Auto-Skip Version
  */
 
 require("dotenv").config();
 require("./settings");
 const fs = require('fs');
+const path = require('path');
 const chalk = require('chalk');
 const pino = require("pino");
 const NodeCache = require("node-cache");
@@ -29,11 +30,14 @@ let whatsappBot = null;
 let whatsappBootstrapPromise = null;
 let lastPairingCode = null;
 
+const SESSION_DIR = path.join(process.cwd(), 'session');
+const CREDS_PATH = path.join(SESSION_DIR, 'creds.json');
+
 // ────────────────────────────────────────────────
 // CUSTOM LOGGER CONFIGURATION
 // ────────────────────────────────────────────────
 const pinoLogger = pino({
-    level: process.env.LOG_LEVEL || 'warn', 
+    level: 'silent', // Imesetiwa 'silent' kuzuia "closed session" logs zisijaze terminal na kuleta lag
     transport: {
         target: 'pino-pretty',
         options: {
@@ -88,6 +92,12 @@ function normalizeWhatsappNumber(phoneNumber) {
 }
 
 async function chooseStartupMode() {
+    // Kama creds.json zipo, nenda moja kwa moja WhatsApp bila kuuliza maswali
+    if (fs.existsSync(CREDS_PATH)) {
+        console.log(chalk.green('✅ Active WhatsApp session found. Auto-forwarding to WhatsApp mode...'));
+        return 'whatsapp';
+    }
+
     const settingMode = settings.mode?.toLowerCase() === 'telegram' ? 'telegram' : 'whatsapp';
     if (!rl) {
         console.log(chalk.yellow(`⚠️ Terminal input unavailable, using settings.js mode: ${settingMode}`));
@@ -130,10 +140,11 @@ async function startMickeyBot(options = {}) {
                 browser: ["Ubuntu", "Chrome", "20.0.04"],
                 auth: {
                     creds: state.creds,
-                    keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }).child({ level: 'silent' }))
+                    keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })) // 'silent' kuzuia CPU spike kwenye background keys logging
                 },
                 markOnlineOnConnect: true,
                 syncFullHistory: false,
+                shouldSyncHistoryMessage: () => false, // Inazuia bot kusoma chat za zamani punde ikichochea (Inaongeza speed sana!)
                 generateHighQualityLinkPreview: true,
                 patchMessageBeforeSending: (message) => {
                     const requiresPatch = !!(message.buttonsMessage || message.templateMessage || message.listMessage);
@@ -162,30 +173,40 @@ async function startMickeyBot(options = {}) {
                     const mek = chatUpdate.messages[0];
                     if (!mek?.message) return;
 
-                    if (isButtonResponse(mek)) {
-                        const buttonId = getButtonId(mek);
-                        if (buttonId) {
-                            console.log(chalk.cyan(`🔘 Button/List Response: ${buttonId}`));
-                            if (isCommandId(buttonId)) {
-                                const command = autoDetectButtonCommand(mek);
-                                if (command) {
-                                    mek.message.conversation = command;
-                                    mek.message.extendedTextMessage = null;
-                                    await handleMessages(Mickey, chatUpdate, true);
-                                    return;
+                    // NON-BLOCKING QUEUE: Inatenganisha event loop ili commands zisichelewe kujibu hata kukiwa na error ya decryption background
+                    setImmediate(async () => {
+                        try {
+                            if (isButtonResponse(mek)) {
+                                const buttonId = getButtonId(mek);
+                                if (buttonId) {
+                                    console.log(chalk.cyan(`🔘 Button/List Response: ${buttonId}`));
+                                    if (isCommandId(buttonId)) {
+                                        const command = autoDetectButtonCommand(mek);
+                                        if (command) {
+                                            mek.message.conversation = command;
+                                            mek.message.extendedTextMessage = null;
+                                            await handleMessages(Mickey, chatUpdate, true);
+                                            return;
+                                        }
+                                    } else {
+                                        console.log(chalk.green(`✅ Button handler triggered for ID: ${buttonId}`));
+                                    }
                                 }
-                            } else {
-                                console.log(chalk.green(`✅ Button handler triggered for ID: ${buttonId}`));
+                            }
+
+                            if (mek.key?.remoteJid === "status@broadcast") {
+                                await handleStatus(Mickey, chatUpdate);
+                                return;
+                            }
+
+                            await handleMessages(Mickey, chatUpdate, true);
+                        } catch (innerErr) {
+                            if (!innerErr.message?.includes("decrypt") && !innerErr.message?.includes("session")) {
+                                console.error("Error executing handler:", innerErr);
                             }
                         }
-                    }
+                    });
 
-                    if (mek.key?.remoteJid === "status@broadcast") {
-                        await handleStatus(Mickey, chatUpdate);
-                        return;
-                    }
-
-                    await handleMessages(Mickey, chatUpdate, true);
                 } catch (err) {
                     if (!err.message?.includes("No session found") &&
                         !err.message?.includes("No matching sessions") &&
