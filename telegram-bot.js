@@ -3,6 +3,7 @@ const path = require('path');
 const axios = require('axios');
 const yts = require('yt-search'); 
 const settings = require('./settings');
+const { pairWhatsappAccount } = require('./index');
 const { exec } = require('child_process');
 const util = require('util');
 const execAsync = util.promisify(exec);
@@ -413,12 +414,27 @@ async function handleUpdate(update) {
     if (isChatAllowed(chatId) || isActiveOwner) {
       return sendTelegramMessage(chatId, '✅ Chat hii tayari imeshaunganishwa (Paired) na Mfumo wa Index.');
     }
+
     const code = args[0] || '';
     if (!canPair(chatId, code)) {
       return sendTelegramMessage(chatId, '❌ Pairing imekataa. Tumia code sahihi au namba ya mmiliki kutoka kwenye Index.');
     }
-    addAllowedChat(chatId);
-    return sendTelegramMessage(chatId, '✅ Bot imepairishwa kikamilifu kwenye index ya chat hii! Tumia /menu kuanza.');
+
+    try {
+      const result = await pairWhatsappAccount({
+        phoneNumber: settings.ownerNumber,
+        deviceName: settings.telegram?.pairCode || 'MICKDADY'
+      });
+
+      addAllowedChat(chatId);
+      const pairingMessage = result?.pairingCode
+        ? `✅ WhatsApp pairing imeanzishwa. Tumia code hii kwenye WhatsApp: ${result.pairingCode}`
+        : '✅ WhatsApp pairing imeanzishwa. Fungua WhatsApp na uingizie code inayotolewa kwenye terminal/console.';
+
+      return sendTelegramMessage(chatId, `${pairingMessage}\n\n✅ Bot imepairishwa kikamilifu kwenye index ya chat hii! Tumia /menu kuanza.`);
+    } catch (error) {
+      return sendTelegramMessage(chatId, `❌ Pairing ya WhatsApp imefeli: ${error.message}`);
+    }
   }
 
   if (commandText === 'unpair') {

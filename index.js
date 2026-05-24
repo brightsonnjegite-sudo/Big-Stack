@@ -24,7 +24,10 @@ const { handleAnticall } = require("./commands/anticall");
 const { getButtonId, isButtonResponse, autoDetectButtonCommand, isCommandId } = require("./lib/buttonLoader");
 const store = require("./lib/lightweight_store");
 const settings = require("./settings");
-const { startTelegramBot } = require("./telegram-bot");
+
+let whatsappBot = null;
+let whatsappBootstrapPromise = null;
+let lastPairingCode = null;
 
 // ────────────────────────────────────────────────
 // CUSTOM LOGGER CONFIGURATION
@@ -78,6 +81,12 @@ const question = (text) => {
     return Promise.resolve(settings.ownerNumber || "255615858685");
 };
 
+function normalizeWhatsappNumber(phoneNumber) {
+    const cleaned = String(phoneNumber || '').replace(/\D/g, '');
+    if (!cleaned) return '';
+    return cleaned.startsWith('255') ? cleaned : `255${cleaned}`;
+}
+
 async function chooseStartupMode() {
     const settingMode = settings.mode?.toLowerCase() === 'telegram' ? 'telegram' : 'whatsapp';
     if (!rl) {
@@ -97,204 +106,228 @@ async function chooseStartupMode() {
     return settingMode;
 }
 
-async function startMickeyBot() {
-    try {
-        console.log('\n' + chalk.bgBlue.white("  🚀  STARTING MICKEY GLITCH BOT  🚀  ") + '\n');
+async function startMickeyBot(options = {}) {
+    if (whatsappBot) return whatsappBot;
+    if (whatsappBootstrapPromise) return whatsappBootstrapPromise;
 
-        const { version } = await fetchLatestBaileysVersion();
-        console.log(chalk.cyan('📦 Baileys Version:'), chalk.green(version.join('.')));
+    whatsappBootstrapPromise = (async () => {
+        try {
+            console.log('\n' + chalk.bgBlue.white("  🚀  STARTING MICKEY GLITCH BOT  🚀  ") + '\n');
 
-        const { state, saveCreds } = await useMultiFileAuthState("./session");
-        console.log(chalk.cyan('📁 Session Status:'), chalk.green('Loaded'));
+            const { version } = await fetchLatestBaileysVersion();
+            console.log(chalk.cyan('📦 Baileys Version:'), chalk.green(version.join('.')));
 
-        const msgRetryCounterCache = new NodeCache();
-        console.log(chalk.cyan('💾 Cache Status:'), chalk.green('Initialized'));
+            const { state, saveCreds } = await useMultiFileAuthState("./session");
+            console.log(chalk.cyan('📁 Session Status:'), chalk.green('Loaded'));
 
-        const newsletterJid = "120363398106360290@newsletter";
+            const msgRetryCounterCache = new NodeCache();
+            console.log(chalk.cyan('💾 Cache Status:'), chalk.green('Initialized'));
 
-        const Mickey = makeWASocket({
-            version,
-            logger: pinoLogger,
-            printQRInTerminal: !pairingCode,
-            browser: ["Ubuntu", "Chrome", "20.0.04"],
-            auth: {
-                creds: state.creds,
-                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }).child({ level: 'silent' }))
-            },
-            markOnlineOnConnect: true,
-            // --- FIXES ADDED HERE ---
-            syncFullHistory: false, 
-            generateHighQualityLinkPreview: true,
-            patchMessageBeforeSending: (message) => {
-                const requiresPatch = !!(message.buttonsMessage || message.templateMessage || message.listMessage);
-                if (requiresPatch) {
-                    message = { viewOnceMessage: { message: { messageContextInfo: { deviceListMetadataVersion: 2, deviceListMetadata: {} }, ...message } } };
-                }
-                return message;
-            },
-            // ------------------------
-            getMessage: async (key) => {
-                if (!key || !key.id) return undefined;
-                const jid = key.remoteJid || key.participant || key.sender || '';
-                const msg = await store.loadMessage(jid, key.id);
-                return msg?.message || undefined;
-            },
-            msgRetryCounterCache
-        });
+            const Mickey = makeWASocket({
+                version,
+                logger: pinoLogger,
+                printQRInTerminal: !pairingCode,
+                browser: ["Ubuntu", "Chrome", "20.0.04"],
+                auth: {
+                    creds: state.creds,
+                    keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }).child({ level: 'silent' }))
+                },
+                markOnlineOnConnect: true,
+                syncFullHistory: false,
+                generateHighQualityLinkPreview: true,
+                patchMessageBeforeSending: (message) => {
+                    const requiresPatch = !!(message.buttonsMessage || message.templateMessage || message.listMessage);
+                    if (requiresPatch) {
+                        message = { viewOnceMessage: { message: { messageContextInfo: { deviceListMetadataVersion: 2, deviceListMetadata: {} }, ...message } } };
+                    }
+                    return message;
+                },
+                getMessage: async (key) => {
+                    if (!key || !key.id) return undefined;
+                    const jid = key.remoteJid || key.participant || key.sender || '';
+                    const msg = await store.loadMessage(jid, key.id);
+                    return msg?.message || undefined;
+                },
+                msgRetryCounterCache
+            });
 
-        Mickey.ev.on("creds.update", saveCreds);
-        store.bind(Mickey.ev);
+            whatsappBot = Mickey;
+            lastPairingCode = null;
 
-        // --- Event Handlers ---
-        Mickey.ev.on("messages.upsert", async chatUpdate => {
-            try {
-                const mek = chatUpdate.messages[0];
-                if (!mek?.message) return;
+            Mickey.ev.on("creds.update", saveCreds);
+            store.bind(Mickey.ev);
 
-                // 🔘 Button & List Handler - Detect any button ID
-                if (isButtonResponse(mek)) {
-                    const buttonId = getButtonId(mek);
-                    if (buttonId) {
-                        console.log(chalk.cyan(`🔘 Button/List Response: ${buttonId}`));
-                        
-                        // Check if button is a command (starts with .)
-                        if (isCommandId(buttonId)) {
-                            // Auto-detect and convert to command for main handler
-                            const command = autoDetectButtonCommand(mek);
-                            if (command) {
-                                // Inject command into message for handling
-                                mek.message.conversation = command;
-                                mek.message.extendedTextMessage = null;
-                                await handleMessages(Mickey, chatUpdate, true);
-                                return;
+            Mickey.ev.on("messages.upsert", async chatUpdate => {
+                try {
+                    const mek = chatUpdate.messages[0];
+                    if (!mek?.message) return;
+
+                    if (isButtonResponse(mek)) {
+                        const buttonId = getButtonId(mek);
+                        if (buttonId) {
+                            console.log(chalk.cyan(`🔘 Button/List Response: ${buttonId}`));
+                            if (isCommandId(buttonId)) {
+                                const command = autoDetectButtonCommand(mek);
+                                if (command) {
+                                    mek.message.conversation = command;
+                                    mek.message.extendedTextMessage = null;
+                                    await handleMessages(Mickey, chatUpdate, true);
+                                    return;
+                                }
+                            } else {
+                                console.log(chalk.green(`✅ Button handler triggered for ID: ${buttonId}`));
                             }
-                        } else {
-                            // Static button handlers (handle any ID dynamically)
-                            console.log(chalk.green(`✅ Button handler triggered for ID: ${buttonId}`));
-                            // Button handlers can be extended here for custom logic
                         }
                     }
+
+                    if (mek.key?.remoteJid === "status@broadcast") {
+                        await handleStatus(Mickey, chatUpdate);
+                        return;
+                    }
+
+                    await handleMessages(Mickey, chatUpdate, true);
+                } catch (err) {
+                    if (!err.message?.includes("No session found") &&
+                        !err.message?.includes("No matching sessions") &&
+                        !err.message?.includes("timed out waiting")) {
+                        console.log(chalk.bgRed.black("  ⚠️  MSG ERROR  ⚠️  "), chalk.red(err.message));
+                    }
                 }
+            });
 
-                // Status updates
-                if (mek.key?.remoteJid === "status@broadcast") {
-                    await handleStatus(Mickey, chatUpdate);
-                    return;
-                }
-                
-                await handleMessages(Mickey, chatUpdate, true);
-            } catch (err) {
-                if (!err.message?.includes("No session found") && 
-                    !err.message?.includes("No matching sessions") &&
-                    !err.message?.includes("timed out waiting")) {
-                    console.log(chalk.bgRed.black("  ⚠️  MSG ERROR  ⚠️  "), chalk.red(err.message));
-                }
-            }
-        });
-
-        Mickey.ev.on("call", async (callData) => {
-            try {
-                await handleAnticall(Mickey, { call: callData });
-            } catch (err) {
-                console.log(chalk.bgRed.black("  ⚠️  CALL ERROR  ⚠️  "), chalk.red(err.message));
-            }
-        });
-
-        Mickey.ev.on("connection.update", async (update) => {
-            const { connection, lastDisconnect } = update;
-
-            if (connection === "open") {
-                console.log('\n' + chalk.bgGreen.white("  ✨  CONNECTED  ✨  "));
-                console.log(chalk.green.bold('✅ Mickey Glitch Online!\n'));
-
-                const myNumber = Mickey.user.id.split(':')[0] + "@s.whatsapp.net";
-                const ramUsage = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
-                const welcomeMsg = `✨ *MICKEY GLITCH BOT* ✨\n🟢 *Status:* Online\n💾 *RAM:* ${ramUsage} MB\n🎯 All Systems Operational`.trim();
-
+            Mickey.ev.on("call", async (callData) => {
                 try {
-                    await Mickey.sendMessage(myNumber, {
-                        text: welcomeMsg,
-                        contextInfo: {
-                            isForwarded: true,
-                            forwardedNewsletterMessageInfo: {
-                                newsletterJid: "120363398106360290@newsletter",
-                                newsletterName: "🅼🅸🅲🅺🅴🆈",
-                                serverMessageId: 100
+                    await handleAnticall(Mickey, { call: callData });
+                } catch (err) {
+                    console.log(chalk.bgRed.black("  ⚠️  CALL ERROR  ⚠️  "), chalk.red(err.message));
+                }
+            });
+
+            Mickey.ev.on("connection.update", async (update) => {
+                const { connection, lastDisconnect } = update;
+
+                if (connection === "open") {
+                    console.log('\n' + chalk.bgGreen.white("  ✨  CONNECTED  ✨  "));
+                    console.log(chalk.green.bold('✅ Mickey Glitch Online!\n'));
+
+                    const myNumber = Mickey.user.id.split(':')[0] + "@s.whatsapp.net";
+                    const ramUsage = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
+                    const welcomeMsg = `✨ *MICKEY GLITCH BOT* ✨\n🟢 *Status:* Online\n💾 *RAM:* ${ramUsage} MB\n🎯 All Systems Operational`.trim();
+
+                    try {
+                        await Mickey.sendMessage(myNumber, {
+                            text: welcomeMsg,
+                            contextInfo: {
+                                isForwarded: true,
+                                forwardedNewsletterMessageInfo: {
+                                    newsletterJid: "120363398106360290@newsletter",
+                                    newsletterName: "🅼🅸🅲🅺🅴🆈",
+                                    serverMessageId: 100
+                                }
                             }
-                        }
-                    });
-                    console.log(chalk.green('📨 Welcome message sent to bot number\n'));
-                } catch (e) {
-                    console.log(chalk.yellow('⚠️ Could not send welcome message\n'));
+                        });
+                        console.log(chalk.green('📨 Welcome message sent to bot number\n'));
+                    } catch (e) {
+                        console.log(chalk.yellow('⚠️ Could not send welcome message\n'));
+                    }
+
+                    try {
+                        await Mickey.sendMessage(myNumber, {
+                            text: '🔔 *Channel Follow Active*\n\nBot is now following:\n120363398106360290@newsletter\n\n✅ All notifications enabled'
+                        });
+                        console.log(chalk.green('📢 Newsletter follow notification sent\n'));
+                    } catch (e) {
+                        console.log(chalk.yellow(`⚠️ Could not send newsletter notification: ${e.message}\n`));
+                    }
+
+                    console.log(chalk.bgGreen.black("  ✅  STARTUP COMPLETE  ✅  "));
+                    console.log(chalk.green('🤖 Bot is ready for tasks.\n'));
                 }
 
-                // Send startup notification to bot owner with newsletter reference
+                if (connection === "close") {
+                    const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+                    if (shouldReconnect) {
+                        console.log('\n' + chalk.bgYellow.black("  🔄  CONNECTION LOST - RECONNECTING...  🔄  ") + '\n');
+                        whatsappBot = null;
+                        await delay(3000);
+                        startMickeyBot();
+                    } else {
+                        console.log('\n' + chalk.bgRed.white("  ❌  LOGGED OUT - RESTART REQUIRED  ❌  ") + '\n');
+                        process.exit(0);
+                    }
+                }
+            });
+
+            if (pairingCode && !Mickey.authState.creds.registered) {
+                const isTelegramTriggered = Boolean(options.useTelegramPairing);
+                console.log('\n' + chalk.bgMagenta.white("  ⏳  PAIRING REQUIRED - SCAN DEVICE  ⏳  ") + '\n');
+
+                let num = isTelegramTriggered
+                    ? normalizeWhatsappNumber(options.phoneNumber || settings.ownerNumber)
+                    : await question(chalk.bgBlack(chalk.greenBright("📱 Enter phone number (e.g., 255xxx): ")));
+
+                if (!num) {
+                    num = normalizeWhatsappNumber(settings.ownerNumber);
+                }
+
+                num = String(num).replace(/[^0-9]/g, '');
+                if (!num.startsWith("255")) num = "255" + num;
+
+                console.log(chalk.yellow('⏳ Generating pairing code...\n'));
+
                 try {
-                    await Mickey.sendMessage(myNumber, {
-                        text: '🔔 *Channel Follow Active*\n\nBot is now following:\n120363398106360290@newsletter\n\n✅ All notifications enabled'
-                    });
-                    console.log(chalk.green('📢 Newsletter follow notification sent\n'));
-                } catch (e) {
-                    console.log(chalk.yellow(`⚠️ Could not send newsletter notification: ${e.message}\n`));
-                }
-
-                console.log(chalk.bgGreen.black("  ✅  STARTUP COMPLETE  ✅  "));
-                console.log(chalk.green('🤖 Bot is ready for tasks.\n'));
-            }
-
-            if (connection === "close") {
-                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-                if (shouldReconnect) {
-                    console.log('\n' + chalk.bgYellow.black("  🔄  CONNECTION LOST - RECONNECTING...  🔄  ") + '\n');
-                    await delay(3000);
-                    startMickeyBot();
-                } else {
-                    console.log('\n' + chalk.bgRed.white("  ❌  LOGGED OUT - RESTART REQUIRED  ❌  ") + '\n');
-                    process.exit(0);
-                }
-            }
-        });
-
-        // --- Custom Pairing Implementation (Unchanged) ---
-        if (pairingCode && !Mickey.authState.creds.registered) {
-            console.log('\n' + chalk.bgMagenta.white("  ⏳  PAIRING REQUIRED - SCAN DEVICE  ⏳  ") + '\n');
-
-            let num = await question(chalk.bgBlack(chalk.greenBright("📱 Enter phone number (e.g., 255xxx): ")));
-            num = num.replace(/[^0-9]/g, '');
-            if (!num.startsWith("255")) num = "255" + num;
-
-            console.log(chalk.yellow('⏳ Generating pairing code...\n'));
-
-            setTimeout(async () => {
-                try {
-                    let code = await Mickey.requestPairingCode(num, "MICKDADY");
+                    const generatedCode = await Mickey.requestPairingCode(num, options.deviceName || settings.telegram?.pairCode || 'MICKDADY');
+                    lastPairingCode = typeof generatedCode === 'string' && generatedCode.trim()
+                        ? generatedCode.trim()
+                        : (options.deviceName || settings.telegram?.pairCode || 'MICKDADY');
 
                     console.log(chalk.bgCyan.black("  🔐  YOUR CUSTOM PAIRING CODE  🔐  "));
-                    console.log(chalk.white.bold("  CODE: ") + chalk.green.bold("MICKDADY"));
+                    console.log(chalk.white.bold("  CODE: ") + chalk.green.bold(lastPairingCode));
                     console.log(chalk.yellow("  → Enter this code in WhatsApp (Settings → Linked Devices)\n"));
                 } catch (e) {
+                    lastPairingCode = options.deviceName || settings.telegram?.pairCode || 'MICKDADY';
                     console.log(chalk.red('❌ Error generating pairing code: ' + e.message + '\n'));
+                    throw e;
                 }
-            }, 3000);
+            }
+
+            console.log(chalk.cyan('✅ Socket initialized successfully\n'));
+            return Mickey;
+        } catch (err) {
+            console.log('\n' + chalk.bgRed.white("  ❌  CRITICAL ERROR  ❌  "));
+            console.log(chalk.red('Error Message: ' + err.message));
+            console.log(chalk.red('Stack: ' + err.stack));
+            console.log(chalk.yellow('⏳ Restarting in 5 seconds...\n'));
+            await delay(5000);
+            startMickeyBot();
+            throw err;
+        } finally {
+            whatsappBootstrapPromise = null;
         }
+    })();
 
-        console.log(chalk.cyan('✅ Socket initialized successfully\n'));
-        return Mickey;
+    return whatsappBootstrapPromise;
+}
 
-    } catch (err) {
-        console.log('\n' + chalk.bgRed.white("  ❌  CRITICAL ERROR  ❌  "));
-        console.log(chalk.red('Error Message: ' + err.message));
-        console.log(chalk.red('Stack: ' + err.stack));
-        console.log(chalk.yellow('⏳ Restarting in 5 seconds...\n'));
-        await delay(5000);
-        startMickeyBot();
-    }
+async function pairWhatsappAccount(options = {}) {
+    const bot = await startMickeyBot({
+        useTelegramPairing: true,
+        phoneNumber: options.phoneNumber || settings.ownerNumber,
+        deviceName: options.deviceName || settings.telegram?.pairCode || 'MICKDADY'
+    });
+
+    return {
+        bot,
+        pairingCode: lastPairingCode,
+        registered: Boolean(bot?.authState?.creds?.registered)
+    };
 }
 
 async function initializeBot() {
   const startupMode = await chooseStartupMode();
   if (startupMode === 'telegram') {
     console.log(chalk.bgBlue.white("\n  🚀  STARTING TELEGRAM BOT  🚀  \n"));
+    const { startTelegramBot } = require("./telegram-bot");
     startTelegramBot();
   } else {
     console.log(chalk.bgBlue.white("\n  🚀  STARTING WHATSAPP CONNECTION  🚀  \n"));
@@ -302,4 +335,12 @@ async function initializeBot() {
   }
 }
 
-initializeBot();
+if (!module.parent) {
+    initializeBot();
+}
+
+module.exports = {
+    initializeBot,
+    startMickeyBot,
+    pairWhatsappAccount
+};
