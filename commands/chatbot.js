@@ -124,15 +124,15 @@ async function handleChatbotMessage(sock, chatId, m, userText = null) {
 - Ongea kama mshkaji wa kijiweni wa Dar es Salaam (Street-smart, witty, and energetic).
 - Slang keywords: 'Oya', 'Niaje mwanangu', 'Mambo vipi', 'Wadao', 'Fresh', 'Inakuwaje', 'Mazee', 'Kinoma'.
 - Tone inatakiwa iwe ya kuchangamka sana, changanya Kiswahili na utani wa kijanja lakini usiwe na matusi. Majibu yawe mafupi na yenye point (Brevity is key).
-- Mtaje mteja kwa jina lake "${userName}" mara kwa mara ili kuleta ukaribu.
+- Mtaje mteja kwa jina lake "\${userName}" mara kwa mara iti kuleta ukaribu.
 
 [ACTIONABLE BUTTONS RULE]
 Kama unampa mtu machaguo, unakaribisha mtu mpya, au unamaliza maelezo yanayohitaji step inayofuata, LAZIMA uweke button kwa muundo huu (Max ni 3 buttons):
 [BUTTON: Maandishi ya Button | id_au_command]
 
 MIFANO:
-- "Oya niaje ${userName}! Inakuwaje leo mwanangu? Karibu Mickey Glitch V3, chagua hapa chini: \n[BUTTON: Fungua Menu | .menu]\n[BUTTON: Ongea na Boss | .owner]"
-- "Mambo yako safi kabisa. Una lingine mwanangu? \n[BUTTON: Uliza Swali | msaada]";
+- "Oya niaje \${userName}! Inakuwaje leo mwanangu? Karibu Mickey Glitch V3, chagua hapa chini: \\n[BUTTON: Fungua Menu | .menu]\\n[BUTTON: Ongea na Boss | .owner]"
+- "Mambo yako safi kabisa. Una lingine mwanangu? \\n[BUTTON: Uliza Swali | msaada]"`;
 
         const fullPrompt = `System Rules:\n${systemPrompt}\n\n---\nChat History:\n${history}\n\n---\nUser: ${userName}\nInput: ${text}\nMickey:`;
 
@@ -153,23 +153,41 @@ MIFANO:
         let extractedButtons = [];
 
         while ((match = buttonRegex.exec(reply)) !== null) {
+            // Muundo sahihi wa gifted-btns kulingana na npm package yao
             extractedButtons.push({
-                displayText: match[1].trim(),
-                id: match[2].trim()
+                name: "quick_reply",
+                buttonParamsJson: JSON.stringify({
+                    display_text: match[1].trim(),
+                    id: match[2].trim()
+                })
             });
+        }
+
+        // Limit idadi ya buttons isizidi 3 (WhatsApp limit kwa quick reply buttons)
+        if (extractedButtons.length > 3) {
+            extractedButtons = extractedButtons.slice(0, 3);
         }
 
         // Kusafisha code za mabano kwenye text ya mwisho
         let cleanReply = reply.replace(buttonRegex, '').trim();
+        if (!cleanReply) cleanReply = "Mambo vipi mwanangu!";
 
         // Hifadhi jibu kwenye kumbukumbu
         memory[chatId].chats.push({ role: "assistant", content: cleanReply });
         await saveMemory(memory);
 
-        // --- TUMA MSG ---
+        // --- TUMA MSG KUPITIA GIFTED-BTNS RASMI ---
         if (extractedButtons.length > 0) {
-            await sendButtons(sock, chatId, cleanReply, "🤖 Mickey Glitch V3", extractedButtons, m);
+            try {
+                // Gifted-btns inahitaji array ya buttons yenye muundo sahihi wa name na buttonParamsJson
+                await sendButtons(sock, chatId, cleanReply, "🤖 Mickey Glitch V3", extractedButtons, m);
+            } catch (btnErr) {
+                console.error('❌ Gifted-Btns Send Error:', btnErr.message);
+                // Fallback kama kuna dharura yoyote kwenye package
+                await sock.sendMessage(chatId, { text: cleanReply }, { quoted: m });
+            }
         } else {
+            // Kama hakuna button zilizochujwa, tuma kama kawaida
             await sock.sendMessage(chatId, { text: cleanReply }, { quoted: m });
         }
 
