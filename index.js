@@ -1,6 +1,7 @@
 /**
  * MICKEY GLITCH - A WhatsApp Bot
  * Clean, Optimized & Auto-Skip Version
+ * [LOW RESOURCE / PANEL OPTIMIZED VERSION]
  */
 
 require("dotenv").config();
@@ -34,44 +35,28 @@ const SESSION_DIR = path.join(process.cwd(), 'session');
 const CREDS_PATH = path.join(SESSION_DIR, 'creds.json');
 
 // ────────────────────────────────────────────────
-// CUSTOM LOGGER CONFIGURATION
+// CUSTOM LOGGER CONFIGURATION (Zimwa zote kuokoa CPU)
 // ────────────────────────────────────────────────
-const pinoLogger = pino({
-    level: 'silent', // Imesetiwa 'silent' kuzuia "closed session" logs zisijaze terminal na kuleta lag
-    transport: {
-        target: 'pino-pretty',
-        options: {
-            colorize: true,
-            translateTime: 'SYS:standard',
-            ignore: 'pid,hostname',
-            singleLine: false,
-            messageFormat: '{levelLabel} - {msg}'
-        }
-    }
-});
-
-const originalLog = console.log;
-console.log = function(...args) {
-    originalLog(...args);
-};
+const pinoLogger = pino({ level: 'silent' });
 
 // --- Global Settings ---
 global.botname = "𝙼𝚒𝚌𝚔𝚎𝚢 𝙶𝚕𝚒𝚝𝚌𝚑™";
 global.themeemoji = '•';
 
-// Initialize store
+// Initialize store (Imepunguzwa kuandika kwenye disk hadi sekunde 30 badala ya 10)
 store.readFromFile();
-setInterval(() => store.writeToFile(), settings.storeWriteInterval || 10000);
+setInterval(() => store.writeToFile(), settings.storeWriteInterval || 30000);
 
-// --- Memory Management ---
+// --- Memory Management (Aggressive Garbage Collection for Panels) ---
 setInterval(() => {
     if (global.gc) global.gc();
-}, 60000);
+}, 30000); 
 
 setInterval(() => {
     const usageMB = process.memoryUsage().rss / 1024 / 1024;
-    if (usageMB > 450) {
-        console.log(chalk.bgRed.white("  ⚠️  MEMORY ALERT  ⚠️  "), chalk.red(`RAM > 450MB (${usageMB.toFixed(2)}MB) → Restarting...`));
+    // Imeshushwa hadi 250MB ili isizidi kikomo cha panel ndogo (e.g. 512MB)
+    if (usageMB > 250) {
+        console.log(chalk.bgRed.white("  ⚠️  MEMORY ALERT  ⚠️  "), chalk.red(`RAM > 250MB (${usageMB.toFixed(2)}MB) → Restarting...`));
         process.exit(1);
     }
 }, 30000);
@@ -92,23 +77,15 @@ function normalizeWhatsappNumber(phoneNumber) {
 }
 
 async function chooseStartupMode() {
-    // Kama creds.json zipo, nenda moja kwa moja WhatsApp bila kuuliza maswali
     if (fs.existsSync(CREDS_PATH)) {
-        console.log(chalk.green('✅ Active WhatsApp session found. Auto-forwarding to WhatsApp mode...'));
-        return 'whatsapp';
+        return 'whatsapp'; // Ruka maswali moja kwa moja kuokoa muda wa panel kuwaka
     }
 
     const settingMode = settings.mode?.toLowerCase() === 'telegram' ? 'telegram' : 'whatsapp';
-    if (!rl) {
-        console.log(chalk.yellow(`⚠️ Terminal input unavailable, using settings.js mode: ${settingMode}`));
-        return settingMode;
-    }
+    if (!rl) return settingMode;
 
     console.log(chalk.bgBlue.white("\n  🚀  MICKEY GLITCH STARTUP MODE  🚀  \n"));
-    console.log('Chagua mode ya bot:');
-    console.log('  1) WhatsApp');
-    console.log('  2) Telegram');
-    console.log(`  3) Tumia mode ya settings.js (${settingMode})`);
+    console.log('Chagua mode ya bot:\n  1) WhatsApp\n  2) Telegram\n  3) Settings.js Mode');
 
     const answer = (await question('Chagua (1/2/3) [3]: ')).trim();
     if (answer === '1') return 'whatsapp';
@@ -122,16 +99,11 @@ async function startMickeyBot(options = {}) {
 
     whatsappBootstrapPromise = (async () => {
         try {
-            console.log('\n' + chalk.bgBlue.white("  🚀  STARTING MICKEY GLITCH BOT  🚀  ") + '\n');
-
             const { version } = await fetchLatestBaileysVersion();
-            console.log(chalk.cyan('📦 Baileys Version:'), chalk.green(version.join('.')));
-
             const { state, saveCreds } = await useMultiFileAuthState("./session");
-            console.log(chalk.cyan('📁 Session Status:'), chalk.green('Loaded'));
-
-            const msgRetryCounterCache = new NodeCache();
-            console.log(chalk.cyan('💾 Cache Status:'), chalk.green('Initialized'));
+            
+            // Limit cache time (TTL) hadi sekunde 60 kuokoa RAM
+            const msgRetryCounterCache = new NodeCache({ stdTTL: 60, checkperiod: 20 });
 
             const Mickey = makeWASocket({
                 version,
@@ -140,12 +112,13 @@ async function startMickeyBot(options = {}) {
                 browser: ["Ubuntu", "Chrome", "20.0.04"],
                 auth: {
                     creds: state.creds,
-                    keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })) // 'silent' kuzuia CPU spike kwenye background keys logging
+                    keys: makeCacheableSignalKeyStore(state.keys, pinoLogger)
                 },
-                markOnlineOnConnect: true,
+                markOnlineOnConnect: true, // IMERUDISHWA: Bot itaonekana ipo 'online' kila ikijiwasha (always online)
                 syncFullHistory: false,
-                shouldSyncHistoryMessage: () => false, // Inazuia bot kusoma chat za zamani punde ikichochea (Inaongeza speed sana!)
-                generateHighQualityLinkPreview: true,
+                shouldSyncHistoryMessage: () => false, // Inazuia kusoma chat za zamani (Inaokoa RAM/Disk)
+                generateHighQualityLinkPreview: false, // ZIMA (Link previews zinakula RAM sana)
+                cachedGroupMetadata: async (jid) => undefined, // Zima cache ya magroup makubwa kwenye RAM
                 patchMessageBeforeSending: (message) => {
                     const requiresPatch = !!(message.buttonsMessage || message.templateMessage || message.listMessage);
                     if (requiresPatch) {
@@ -173,23 +146,17 @@ async function startMickeyBot(options = {}) {
                     const mek = chatUpdate.messages[0];
                     if (!mek?.message) return;
 
-                    // NON-BLOCKING QUEUE: Inatenganisha event loop ili commands zisichelewe kujibu hata kukiwa na error ya decryption background
                     setImmediate(async () => {
                         try {
                             if (isButtonResponse(mek)) {
                                 const buttonId = getButtonId(mek);
-                                if (buttonId) {
-                                    console.log(chalk.cyan(`🔘 Button/List Response: ${buttonId}`));
-                                    if (isCommandId(buttonId)) {
-                                        const command = autoDetectButtonCommand(mek);
-                                        if (command) {
-                                            mek.message.conversation = command;
-                                            mek.message.extendedTextMessage = null;
-                                            await handleMessages(Mickey, chatUpdate, true);
-                                            return;
-                                        }
-                                    } else {
-                                        console.log(chalk.green(`✅ Button handler triggered for ID: ${buttonId}`));
+                                if (buttonId && isCommandId(buttonId)) {
+                                    const command = autoDetectButtonCommand(mek);
+                                    if (command) {
+                                        mek.message.conversation = command;
+                                        mek.message.extendedTextMessage = null;
+                                        await handleMessages(Mickey, chatUpdate, true);
+                                        return;
                                     }
                                 }
                             }
@@ -200,80 +167,38 @@ async function startMickeyBot(options = {}) {
                             }
 
                             await handleMessages(Mickey, chatUpdate, true);
-                        } catch (innerErr) {
-                            if (!innerErr.message?.includes("decrypt") && !innerErr.message?.includes("session")) {
-                                console.error("Error executing handler:", innerErr);
-                            }
-                        }
+                        } catch (innerErr) {}
                     });
 
-                } catch (err) {
-                    if (!err.message?.includes("No session found") &&
-                        !err.message?.includes("No matching sessions") &&
-                        !err.message?.includes("timed out waiting")) {
-                        console.log(chalk.bgRed.black("  ⚠️  MSG ERROR  ⚠️  "), chalk.red(err.message));
-                    }
-                }
+                } catch (err) {}
             });
 
             Mickey.ev.on("call", async (callData) => {
                 try {
                     await handleAnticall(Mickey, { call: callData });
-                } catch (err) {
-                    console.log(chalk.bgRed.black("  ⚠️  CALL ERROR  ⚠️  "), chalk.red(err.message));
-                }
+                } catch (err) {}
             });
 
             Mickey.ev.on("connection.update", async (update) => {
                 const { connection, lastDisconnect } = update;
 
                 if (connection === "open") {
-                    console.log('\n' + chalk.bgGreen.white("  ✨  CONNECTED  ✨  "));
-                    console.log(chalk.green.bold('✅ Mickey Glitch Online!\n'));
-
+                    console.log(chalk.green.bold('\n✅ Mickey Glitch Online!\n'));
                     const myNumber = Mickey.user.id.split(':')[0] + "@s.whatsapp.net";
                     const ramUsage = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
-                    const welcomeMsg = `✨ *MICKEY GLITCH BOT* ✨\n🟢 *Status:* Online\n💾 *RAM:* ${ramUsage} MB\n🎯 All Systems Operational`.trim();
-
+                    
                     try {
-                        await Mickey.sendMessage(myNumber, {
-                            text: welcomeMsg,
-                            contextInfo: {
-                                isForwarded: true,
-                                forwardedNewsletterMessageInfo: {
-                                    newsletterJid: "120363398106360290@newsletter",
-                                    newsletterName: "🅼🅸🅲🅺🅴🆈",
-                                    serverMessageId: 100
-                                }
-                            }
-                        });
-                        console.log(chalk.green('📨 Welcome message sent to bot number\n'));
-                    } catch (e) {
-                        console.log(chalk.yellow('⚠️ Could not send welcome message\n'));
-                    }
-
-                    try {
-                        await Mickey.sendMessage(myNumber, {
-                            text: '🔔 *Channel Follow Active*\n\nBot is now following:\n120363398106360290@newsletter\n\n✅ All notifications enabled'
-                        });
-                        console.log(chalk.green('📢 Newsletter follow notification sent\n'));
-                    } catch (e) {
-                        console.log(chalk.yellow(`⚠️ Could not send newsletter notification: ${e.message}\n`));
-                    }
-
-                    console.log(chalk.bgGreen.black("  ✅  STARTUP COMPLETE  ✅  "));
-                    console.log(chalk.green('🤖 Bot is ready for tasks.\n'));
+                        await Mickey.sendMessage(myNumber, { text: `🟢 *Mickey Glitch Ready!*\n💾 *RAM:* ${ramUsage} MB` });
+                    } catch (e) {}
                 }
 
                 if (connection === "close") {
                     const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
                     if (shouldReconnect) {
-                        console.log('\n' + chalk.bgYellow.black("  🔄  CONNECTION LOST - RECONNECTING...  🔄  ") + '\n');
                         whatsappBot = null;
-                        await delay(3000);
+                        await delay(5000); 
                         startMickeyBot();
                     } else {
-                        console.log('\n' + chalk.bgRed.white("  ❌  LOGGED OUT - RESTART REQUIRED  ❌  ") + '\n');
                         process.exit(0);
                     }
                 }
@@ -281,45 +206,25 @@ async function startMickeyBot(options = {}) {
 
             if (pairingCode && !Mickey.authState.creds.registered) {
                 const isTelegramTriggered = Boolean(options.useTelegramPairing);
-                console.log('\n' + chalk.bgMagenta.white("  ⏳  PAIRING REQUIRED - SCAN DEVICE  ⏳  ") + '\n');
-
                 let num = isTelegramTriggered
                     ? normalizeWhatsappNumber(options.phoneNumber || settings.ownerNumber)
-                    : await question(chalk.bgBlack(chalk.greenBright("📱 Enter phone number (e.g., 255xxx): ")));
+                    : await question(chalk.greenBright("📱 Enter phone number: "));
 
-                if (!num) {
-                    num = normalizeWhatsappNumber(settings.ownerNumber);
-                }
-
+                if (!num) num = normalizeWhatsappNumber(settings.ownerNumber);
                 num = String(num).replace(/[^0-9]/g, '');
-                if (!num.startsWith("255")) num = "255" + num;
-
-                console.log(chalk.yellow('⏳ Generating pairing code...\n'));
 
                 try {
                     const generatedCode = await Mickey.requestPairingCode(num, options.deviceName || settings.telegram?.pairCode || 'MICKDADY');
-                    lastPairingCode = typeof generatedCode === 'string' && generatedCode.trim()
-                        ? generatedCode.trim()
-                        : (options.deviceName || settings.telegram?.pairCode || 'MICKDADY');
-
-                    console.log(chalk.bgCyan.black("  🔐  YOUR CUSTOM PAIRING CODE  🔐  "));
-                    console.log(chalk.white.bold("  CODE: ") + chalk.green.bold(lastPairingCode));
-                    console.log(chalk.yellow("  → Enter this code in WhatsApp (Settings → Linked Devices)\n"));
+                    lastPairingCode = typeof generatedCode === 'string' ? generatedCode.trim() : 'MICKDADY';
+                    console.log(chalk.white.bold("\n🔐 CODE: ") + chalk.green.bold(lastPairingCode) + "\n");
                 } catch (e) {
-                    lastPairingCode = options.deviceName || settings.telegram?.pairCode || 'MICKDADY';
-                    console.log(chalk.red('❌ Error generating pairing code: ' + e.message + '\n'));
                     throw e;
                 }
             }
 
-            console.log(chalk.cyan('✅ Socket initialized successfully\n'));
             return Mickey;
         } catch (err) {
             whatsappBot = null;
-            console.log('\n' + chalk.bgRed.white("  ❌  CRITICAL ERROR  ❌  "));
-            console.log(chalk.red('Error Message: ' + err.message));
-            console.log(chalk.red('Stack: ' + err.stack));
-            console.log(chalk.yellow('⏳ Restarting in 5 seconds...\n'));
             await delay(5000);
             startMickeyBot();
             throw err;
@@ -337,32 +242,19 @@ async function pairWhatsappAccount(options = {}) {
         phoneNumber: options.phoneNumber || settings.ownerNumber,
         deviceName: options.deviceName || settings.telegram?.pairCode || 'MICKDADY'
     });
-
-    return {
-        bot,
-        pairingCode: lastPairingCode,
-        registered: Boolean(bot?.authState?.creds?.registered)
-    };
+    return { bot, pairingCode: lastPairingCode, registered: Boolean(bot?.authState?.creds?.registered) };
 }
 
 async function initializeBot() {
   const startupMode = await chooseStartupMode();
   if (startupMode === 'telegram') {
-    console.log(chalk.bgBlue.white("\n  🚀  STARTING TELEGRAM BOT  🚀  \n"));
     const { startTelegramBot } = require("./telegram-bot");
     startTelegramBot();
   } else {
-    console.log(chalk.bgBlue.white("\n  🚀  STARTING WHATSAPP CONNECTION  🚀  \n"));
     startMickeyBot();
   }
 }
 
-if (!module.parent) {
-    initializeBot();
-}
+if (!module.parent) initializeBot();
 
-module.exports = {
-    initializeBot,
-    startMickeyBot,
-    pairWhatsappAccount
-};
+module.exports = { initializeBot, startMickeyBot, pairWhatsappAccount };
