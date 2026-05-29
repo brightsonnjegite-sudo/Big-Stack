@@ -110,7 +110,7 @@ async function handleChatbotMessage(sock, chatId, m, userText = null) {
         if (memory[chatId].chats.length > 8) memory[chatId].chats.shift();
 
         const history = memory[chatId].chats
-            .map(msg => `${msg.role === 'user' ? msg.name : 'Mickey'}: ${msg.content}`)
+            .map(msg => `${msg.role === 'user' ? msg.name : 'macdesigner'}: ${msg.content}`)
             .join("\n");
 
         // --- FULL SYSTEM PROMPT (PROMPT KALI YA KIJANJA) ---
