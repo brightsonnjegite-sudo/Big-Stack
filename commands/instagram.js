@@ -166,14 +166,14 @@ async function instagramCommand(sock, chatId, message) {
                             video: finalBuffer,
                             mimetype: 'video/mp4',
                             fileName: `instagram.mp4`,
-                            caption: "𝙼𝚒𝚌𝚔𝚎𝚢 𝙶𝚕𝚒𝚝𝚌𝚑™"
+                            caption: "𝙼acdesigner™"
                         }, { quoted: message });
                     } else {
                         // Fallback to URL send
                         await sock.sendMessage(chatId, {
                             video: { url: mediaUrl },
                             mimetype: "video/mp4",
-                            caption: "𝙼𝚒𝚌𝚔𝚎𝚢 𝙶𝚕𝚒𝚝𝚌𝚑™"
+                            caption: "Macdesigner™"
                         }, { quoted: message });
                     }
                 } catch (sendErr) {
@@ -181,13 +181,13 @@ async function instagramCommand(sock, chatId, message) {
                     await sock.sendMessage(chatId, {
                         video: { url: mediaUrl },
                         mimetype: "video/mp4",
-                        caption: "𝙼𝚒𝚌𝚔𝚎𝚢 𝙶𝚕𝚒𝚝𝚌𝚑™"
+                        caption: "Macdesigner ™"
                     }, { quoted: message });
                 }
             } else {
                 await sock.sendMessage(chatId, {
                     image: { url: mediaUrl },
-                    caption: "𝙼𝚒𝚌𝚔𝚎𝚢 𝙶𝚕𝚒𝚝𝚌𝚑™"
+                    caption: "Macdesigner™"
                 }, { quoted: message });
             }
 
