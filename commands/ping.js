@@ -34,7 +34,7 @@ async function pingCommand(sock, chatId, message) {
 🖥️ *CPU Cores:* ${cpu}
 💻 *Platform:* ${platform}
 ━━━━━━━━━━━━━━━━━━━━━━
-*© 2026 Mickey Glitch Labs™*`;
+*© 2026 Mac designer Labs™*`;
 
         const buttons = [
             { id: '.ping', text: '🔄 REFRESH' },
@@ -45,7 +45,7 @@ async function pingCommand(sock, chatId, message) {
         await sendButtons(sock, chatId, {
             title: '⚡ PING RESULTS',
             text: pingText,
-            footer: 'Mickey Glitch Tech',
+            footer: 'Mac designer Tech',
             buttons: buttons
         }, { quoted: message });
 
