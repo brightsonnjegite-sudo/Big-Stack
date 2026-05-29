@@ -47,7 +47,7 @@ const aliveCommand = async (sock, chatId, msg) => {
 
         // Message Template
         const statusMessage = `
-╭━━━〔 *ＭＩＣＫＥＹ-Ｖ３* 〕━━━┈⊷
+╭━━━〔 *ＭＡＣ_ＤＥＳＩＧＮＥＲ* 〕━━━┈⊷
 ┃ 👤 *User:* ${msg.pushName || 'Guest'}
 ┃ 🕒 *Time:* ${time} EAT
 ┃ 🚀 *Latency:* ${latency}ms
@@ -60,13 +60,13 @@ const aliveCommand = async (sock, chatId, msg) => {
 ┃ 🟢 *Status:* Online & Stable
 ╰━━━━━━━━━━━━━━━━━━┈⊷
 
-*© 2026 Mickey Glitch Technology*`.trim();
+*© 2026 macdesigner Technology*`.trim();
 
         // Send interactive response directly
         await sendButtons(sock, chatId, {
             title: 'SYSTEM ACTIVE',
             text: statusMessage,
-            footer: 'Powered by Mickey Glitch Tech',
+            footer: 'Powered by Mac designer Tech',
             image: { url: imageUrl },
             buttons: [
                 { id: '.menu', text: '🆘 Menu' },
