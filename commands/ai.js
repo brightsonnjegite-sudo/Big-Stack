@@ -10,7 +10,7 @@ const aiCommand = async (sock, chatId, msg, args) => {
 
     if (!query) {
         return sock.sendMessage(chatId, { 
-            text: '╭━━━〔 *MICKEY AI* 〕━━━┈⊷\n┃\n┃ 📝 *Usage:* `.ai [swali lako]`\n┃ 💡 *Example:* `.ai mambo vipi?`\n┃\n╰━━━━━━━━━━━━━━━━━━━━┈⊷' 
+            text: '╭━━━〔 *macdesigner ai* 〕━━━┈⊷\n┃\n┃ 📝 *Usage:* `.ai [swali lako]`\n┃ 💡 *Example:* `.ai mambo vipi?`\n┃\n╰━━━━━━━━━━━━━━━━━━━━┈⊷' 
         }, { quoted: msg });
     }
 
@@ -24,13 +24,13 @@ const aiCommand = async (sock, chatId, msg, args) => {
 
     try {
         // 2. SYSTEM PROMPT (IDENTITY & CONTEXT)
-        const systemPrompt = `[ROLE]: Wewe ni MICKEY GLITCH V3, genius AI msaidizi uliyetengenezwa na MICKDADI HAMZA (Quantum Code Dev).
+        const systemPrompt = `[ROLE]: Wewe ni MACDESIGNER V3, genius AI msaidizi uliyetengenezwa na macdesigner (Quantum Code Dev).
 [CONTEXT]: Repo yako ipo hapa: https://github.com/Mickeydeveloper/Mickey-Glitch.
 [RULES]:
 - Ongea kishkaji (Bongo Swahili Slang).
 - Jibu yawe mafupi na yenye akili.
 - Usijitaje kama AI wa OpenAI au Microsoft.
-- Kama ishu ni ngumu, waambie wamcheki Mickdadi (255612130873).`;
+- Kama ishu ni ngumu, waambie wamcheki Macdesigner (255741922339).`;
 
         const fullQuery = `${systemPrompt}\n\nUser: ${query}\nAnswer:`;
 
@@ -68,7 +68,7 @@ const aiCommand = async (sock, chatId, msg, args) => {
             finalReply = finalReply.replace(/Microsoft|Copilot|OpenAI|GPT-3|GPT-4|ChatGPT/gi, "Mickey Glitch");
 
             const responseText = 
-                `╭━━━━〔 *MICKEY AI* 〕━━━━┈⊷\n` +
+                `╭━━━━〔 *macdesigner ai* 〕━━━━┈⊷\n` +
                 `┃\n` +
                 `┃ ${finalReply.trim()}\n` +
                 `┃\n` +
