@@ -10,7 +10,7 @@ const CONFIG = {
     PRICE_PER_GB: 1000,
     SELLER_NUMBER: '255615944741@s.whatsapp.net',
     BANNER: 'https://files.catbox.moe/ljabyq.png',
-    FOOTER: '🚀 Powered by Mickey Glitch Tech',
+    FOOTER: '🚀 Powered by Mac designer Tech',
     PAYMENT_NO: '0615944741'
 };
 
@@ -24,7 +24,7 @@ const PACKAGES = [
 
 async function askMickeyBiz(query, userName, context = "") {
     try {
-        const bizPrompt = `Wewe ni Mickey Biz AI. Unauza bando (1GB=1000). Mteja ni ${userName}. Jibu kishkaji sana (Bongo Slang).`;
+        const bizPrompt = `Wewe ni Mac bzy AI. Unauza bando (1GB=1000). Mteja ni ${userName}. Jibu kishkaji sana (Bongo Slang).`;
         const res = await axios.get(`https://apiskeith.top/ai/gpt?q=${encodeURIComponent(bizPrompt + query)}`);
         return res.data.data || res.data.result || "Lipia bando mwanangu tuwashe mitambo.";
     } catch (e) { return "Nipo hapa! Lipia chap nikuwashie bando."; }
@@ -65,7 +65,7 @@ async function halotelCommand(sock, chatId, m, body = '') {
             ];
 
             return await sendInteractiveMessage(sock, chatId, {
-                text: `✨ *MICKEY BIZ - ODA YAKO*\n\n${aiInstruction}\n\n📊 *DATA:* ${gbValue}GB\n💰 *BEI:* TSh ${totalPrice.toLocaleString()}\n📌 *MTANDAO:* Halotel\n\nUkishalipa, tuma screenshot hapa chap! 🚀`,
+                text: `✨ *MAC BIZ - ODA YAKO*\n\n${aiInstruction}\n\n📊 *DATA:* ${gbValue}GB\n💰 *BEI:* TSh ${totalPrice.toLocaleString()}\n📌 *MTANDAO:* Halotel\n\nUkishalipa, tuma screenshot hapa chap! 🚀`,
                 footer: CONFIG.FOOTER,
                 interactiveButtons: paymentButtons
             }, { quoted: m });
