@@ -13,9 +13,9 @@ async function ownerCommand(sock, chatId, m, body = '') {
         }
 
         // 2. Data za Owner
-        const ownerNumberRaw = settings.ownerNumber || '255612130873';
-        const ownerName = settings.botOwner || 'Mickey Developer';
-        const botName = settings.botName || 'MICKEY GLITCH';
+        const ownerNumberRaw = settings.ownerNumber || '255741922339';
+        const ownerName = settings.botOwner || 'Macdesigner Developer';
+        const botName = settings.botName || 'MACDESIGNER';
         
         const cleanNumber = ownerNumberRaw.replace(/[^\d]/g, '');
         const waLink = `https://wa.me/${cleanNumber}`;
@@ -57,7 +57,7 @@ _Wasiliana na mkuu kwa msaada zaidi au projects._ 👇`;
 
         const msgOptions = {
             text: ownerText,
-            footer: "Mickey Glitch Tech • 2026",
+            footer: "Mac designer tech• 2026",
             image: { url: imageUrl },
             interactiveButtons: [
                 { 
