@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const settings = require('../settings');
 
+const FOOTER = '© bigmanj tech ™ with ♥︎';
+
 /**
  * Download files from Google Drive using API
  */
@@ -13,13 +15,13 @@ async function gdriveCommand(sock, chatId, message, args) {
 
         if (!gdriveUrl || !gdriveUrl.includes('drive.google.com')) {
             return await sock.sendMessage(chatId, {
-                text: '❌ *Invalid Google Drive link!*\n\n*Usage:* `.gdrive <drive_link>`\n\n*Example:*\n`.gdrive https://drive.google.com/file/d/...'
+                text: `❌ *Invalid Google Drive link!*\n\n*Usage:* \`.gdrive <drive_link>\`\n\n*Example:*\n\`.gdrive https://drive.google.com/file/d/...\`\n\n${FOOTER}`
             }, { quoted: message });
         }
 
         // Send processing message
         const statusMsg = await sock.sendMessage(chatId, {
-            text: '⏳ *Fetching file details...*'
+            text: `⏳ *Fetching file details...*\n\n${FOOTER}`
         }, { quoted: message });
 
         try {
@@ -37,7 +39,7 @@ async function gdriveCommand(sock, chatId, message, args) {
 
             if (!apiData.data?.status) {
                 return await sock.sendMessage(chatId, {
-                    text: '❌ *Failed to fetch file!*\n\n_The file might be private, deleted, or restricted._'
+                    text: `❌ *Failed to fetch file!*\n\n_The file might be private, deleted, or restricted._\n\n${FOOTER}`
                 }, { quoted: message });
             }
 
@@ -52,13 +54,13 @@ async function gdriveCommand(sock, chatId, message, args) {
             // Check file size limit (100MB max)
             if (fileSize > 100 * 1024 * 1024) {
                 return await sock.sendMessage(chatId, {
-                    text: `❌ *File too large!*\n\n_Size: ${fileSizeMB}MB (Max: 100MB)_\n\n📥 *Direct Download:*\n${downloadUrl}`
+                    text: `❌ *File too large!*\n\n_Size: ${fileSizeMB}MB (Max: 100MB)_\n\n📥 *Direct Download:*\n${downloadUrl}\n\n${FOOTER}`
                 }, { quoted: message });
             }
 
             // Update status
             await sock.sendMessage(chatId, {
-                text: `⏳ *Downloading...*\n_Size: ${fileSizeMB}MB_`
+                text: `⏳ *Downloading...*\n_Size: ${fileSizeMB}MB_\n\n${FOOTER}`
             }, { quoted: statusMsg });
 
             // Download file
@@ -94,7 +96,9 @@ async function gdriveCommand(sock, chatId, message, args) {
 📊 *Size:* ${fileSizeMB}MB
 🆔 *File ID:* ${fileData.file_id}
 
-_Downloaded using MICKEY GLITCH_`
+_Downloaded using MICKEY GLITCH_
+
+${FOOTER}`
             }, { quoted: message });
 
         } catch (error) {
@@ -110,6 +114,8 @@ _Downloaded using MICKEY GLITCH_`
                 errorMsg += `\n\n📥 *Try this direct link:*\n${directLink}`;
             }
 
+            errorMsg += `\n\n${FOOTER}`;
+
             await sock.sendMessage(chatId, {
                 text: errorMsg
             }, { quoted: message });
@@ -118,7 +124,7 @@ _Downloaded using MICKEY GLITCH_`
     } catch (e) {
         console.error('GDrive Cmd Error:', e);
         await sock.sendMessage(chatId, {
-            text: '❌ *Error occurred! (Hitilafu imetokea)*'
+            text: `❌ *Error occurred! (Hitilafu imetokea)*\n\n${FOOTER}`
         }, { quoted: message });
     }
 }
