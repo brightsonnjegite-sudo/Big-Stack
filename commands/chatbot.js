@@ -1,231 +1,272 @@
-const fs = require('fs').promises;
+const fs = require('fs');
 const path = require('path');
-const fetch = require('node-fetch');
-// Kutumia npm ya gifted-btns kwa ajili ya button za kisasa
-const { sendButtons } = require('gifted-btns');
 
-// Paths za kuhifadhi data
+// ========== HARDCODED OWNER NUMBERS ==========
+const OWNER_NUMBERS = [
+    '255777580820@s.whatsapp.net',   // ← replace with your own number
+];
+// =============================================
+
+const FOOTER = '© bigmanj tech ™ with ♥︎';
+
 const STATE_PATH = path.join(__dirname, '..', 'data', 'chatbot.json');
 const MEMORY_PATH = path.join(__dirname, '..', 'data', 'chatbot_memory.json');
 
-// --- HELPERS (ASYNC & FAST) ---
-async function loadState() {
-    try {
-        const data = await fs.readFile(STATE_PATH, 'utf8');
-        return { perGroup: {}, private: false, ...JSON.parse(data) };
-    } catch (e) { 
-        return { perGroup: {}, private: false }; 
-    }
+// ---------- LANGUAGE DETECTION ----------
+function detectLanguage(text) {
+    const swahiliWords = [
+        'habari', 'jina', 'asante', 'tafadhali', 'sawa', 'ndio', 'hapana',
+        'kwaheri', 'pole', 'nzuri', 'mbaya', 'leo', 'kesho', 'jana',
+        'mimi', 'wewe', 'yeye', 'sisi', 'nyinyi', 'wao', 'ni', 'na', 'wa',
+        'kwangu', 'kwako', 'kwake', 'kwetu', 'kwenu', 'kwao'
+    ];
+    const lower = text.toLowerCase();
+    const count = swahiliWords.filter(w => lower.includes(w)).length;
+    return count > 0 ? 'sw' : 'en';
 }
 
-async function saveState(state) {
+// ---------- STATE & MEMORY MANAGEMENT ----------
+function loadState() {
     try {
-        await fs.mkdir(path.dirname(STATE_PATH), { recursive: true });
-        await fs.writeFile(STATE_PATH, JSON.stringify(state, null, 2));
-    } catch (e) { 
-        console.error('❌ State Save Err:', e); 
-    }
+        if (!fs.existsSync(STATE_PATH)) return { perGroup: {}, private: false };
+        return JSON.parse(fs.readFileSync(STATE_PATH, 'utf8'));
+    } catch { return { perGroup: {}, private: false }; }
+}
+function saveState(state) {
+    const dir = path.dirname(STATE_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
 }
 
-async function loadMemory() {
+function loadMemory() {
     try {
-        const data = await fs.readFile(MEMORY_PATH, 'utf8');
-        const memory = JSON.parse(data);
+        if (!fs.existsSync(MEMORY_PATH)) return {};
+        const data = JSON.parse(fs.readFileSync(MEMORY_PATH, 'utf8'));
         const now = Date.now();
         let changed = false;
-
-        for (const id in memory) {
-            // Memory inafutwa baada ya dk 10 isijae (600,000 ms)
-            if (memory[id].lastUpdate && (now - memory[id].lastUpdate > 600000)) {
-                delete memory[id];
+        for (const id in data) {
+            if (data[id].lastUpdate && (now - data[id].lastUpdate > 600000)) {
+                delete data[id];
                 changed = true;
             }
         }
-        if (changed) await saveMemory(memory);
-        return memory;
-    } catch (e) { 
-        return {}; 
-    }
+        if (changed) saveMemory(data);
+        return data;
+    } catch { return {}; }
+}
+function saveMemory(memory) {
+    const dir = path.dirname(MEMORY_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(MEMORY_PATH, JSON.stringify(memory, null, 2));
 }
 
-async function saveMemory(memory) {
+function isOwner(senderId) {
+    return OWNER_NUMBERS.includes(senderId);
+}
+
+// ---------- MEDIA DETECTION ----------
+function detectMediaAndText(m) {
+    const msg = m.message;
+    if (!msg) return { type: 'none', text: '', caption: '' };
+
+    if (msg.stickerMessage) return { type: 'sticker', text: '[Sticker]', caption: '' };
+    if (msg.videoMessage && msg.videoMessage.gifPlayback) {
+        const caption = msg.videoMessage.caption || '';
+        return { type: 'gif', text: caption || '[GIF]', caption, duration: msg.videoMessage.seconds || 0 };
+    }
+    if (msg.videoMessage && !msg.videoMessage.gifPlayback) {
+        const caption = msg.videoMessage.caption || '';
+        const seconds = msg.videoMessage.seconds || 0;
+        return { type: 'video', text: caption || `[Video, ${Math.round(seconds)}s]`, caption, duration: seconds };
+    }
+    if (msg.audioMessage && msg.audioMessage.ptt === true) {
+        const seconds = msg.audioMessage.seconds || 0;
+        return { type: 'voice', text: `[Voice note, ${Math.round(seconds)}s]`, caption: '', duration: seconds };
+    }
+    if (msg.audioMessage && msg.audioMessage.ptt !== true) {
+        const seconds = msg.audioMessage.seconds || 0;
+        if (seconds >= 60 && seconds <= 120) {
+            return { type: 'audio', text: `[Audio, ${Math.round(seconds)}s]`, caption: '', duration: seconds };
+        } else {
+            return { type: 'ignore', text: '', caption: '' };
+        }
+    }
+    if (msg.imageMessage) {
+        const caption = msg.imageMessage.caption || '';
+        return { type: 'image', text: caption || '[Image]', caption };
+    }
+    const text = (msg.conversation || msg.extendedTextMessage?.text || '').trim();
+    if (text) return { type: 'text', text, caption: '' };
+    return { type: 'none', text: '', caption: '' };
+}
+
+// ---------- AI API CALL ----------
+async function getAIReply(prompt) {
     try {
-        await fs.mkdir(path.dirname(MEMORY_PATH), { recursive: true });
-        await fs.writeFile(MEMORY_PATH, JSON.stringify(memory, null, 2));
-    } catch (e) { 
-        console.error('❌ Memory Save Err:', e); 
+        const url = `https://api.yupra.my.id/api/ai/gpt5?text=${encodeURIComponent(prompt)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        return data?.response || data?.result || data?.message || data?.data || "";
+    } catch (err) {
+        console.error('API error:', err);
+        return "";
     }
 }
 
-function extractText(m) {
-    try {
-        if (!m || !m.message) return '';
-        const msg = m.message;
-        return (
-            msg.conversation || 
-            msg.extendedTextMessage?.text || 
-            msg.imageMessage?.caption || 
-            msg.videoMessage?.caption || 
-            msg.buttonsResponseMessage?.selectedButtonId || 
-            msg.buttonsResponseMessage?.selectedDisplayText ||
-            msg.templateButtonReplyMessage?.selectedId ||
-            msg.listResponseMessage?.singleSelectReply?.selectedRowId ||
-            msg.interactiveResponseMessage?.nativeFlowResponseMessage?.name ||
-            (msg.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson ? 
-                JSON.parse(msg.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson).id : '') ||
-            ''
-        ).trim();
-    } catch (e) { 
-        return ''; 
-    }
+// ---------- FALLBACK REPLIES (if API fails) ----------
+function getFallbackReply(type, lang) {
+    const replies = {
+        sw: {
+            sticker: "Stika nzuri mwanangu! 😂",
+            gif: "Hiyo GIF inachekesha! 😄",
+            video: "Video poa!",
+            voice: "Nimeelewa sauti yako.",
+            image: "Picha nzuri!",
+            default: "Sawa, naendelea kusikiliza."
+        },
+        en: {
+            sticker: "Nice sticker! 😂",
+            gif: "That GIF is funny! 😄",
+            video: "Cool video!",
+            voice: "Got your voice note.",
+            image: "Nice image!",
+            default: "Okay, I'm listening."
+        }
+    };
+    return replies[lang]?.[type] || replies[lang]?.default || "I'm here.";
 }
 
-// --- MAIN CHATBOT HANDLER ---
+// ---------- MAIN CHATBOT HANDLER ----------
 async function handleChatbotMessage(sock, chatId, m, userText = null) {
     try {
         if (!chatId || m.key?.fromMe) return;
 
-        const text = userText || extractText(m);
-        // Puuza command na text tupu
-        if (!text || /^[.!\/]/.test(text)) return; 
+        const { type, text, caption, duration } = detectMediaAndText(m);
+        if (type === 'ignore') return;
 
-        const userName = m.pushName || 'Mshkaji'; 
-        const state = await loadState();
+        let finalText = text;
+        if (type === 'text' && userText) finalText = userText;
+        if (!finalText && type !== 'none') finalText = `[${type}]`;
+
+        // Ignore commands (starts with ., !, /)
+        if (type === 'text' && (finalText.startsWith('.') || finalText.startsWith('!') || finalText.startsWith('/'))) return;
+
+        const state = loadState();
         const isGroup = chatId.endsWith('@g.us');
         const enabled = isGroup ? !!state.perGroup?.[chatId]?.enabled : !!state.private;
-
         if (!enabled) return;
 
-        // --- CHAP KWA CHAP: TYPING INDICATOR ---
         sock.sendPresenceUpdate('composing', chatId).catch(() => {});
 
-        let memory = await loadMemory();
+        const detectedLang = detectLanguage(finalText);
+        const langInstruction = detectedLang === 'sw' ? 'Jibu kwa Kiswahili.' : 'Respond in English.';
+
+        let memory = loadMemory();
         if (!memory[chatId]) memory[chatId] = { chats: [], lastUpdate: Date.now() };
 
-        // Hifadhi text ya mtumiaji na update muda
-        memory[chatId].chats.push({ role: "user", content: text, name: userName });
+        const userName = m.pushName || 'Mshkaji';
+
+        // Build a descriptive user message for non‑text media
+        let userDisplay = finalText;
+        if (type !== 'text') {
+            if (type === 'sticker') userDisplay = "💠 alituma stika";
+            else if (type === 'gif') userDisplay = `🎞️ alituma GIF: ${caption ? `"${caption}"` : 'bila caption'}`;
+            else if (type === 'video') userDisplay = `📹 alituma video ya ${Math.round(duration)}s: ${caption ? `"${caption}"` : ''}`;
+            else if (type === 'voice') userDisplay = `🎙️ alituma ujumbe wa sauti (${Math.round(duration)}s)`;
+            else if (type === 'audio') userDisplay = `🎵 alituma wimbo wa WhatsApp (${Math.round(duration)}s)`;
+            else if (type === 'image') userDisplay = `🖼️ alituma picha: ${caption ? `"${caption}"` : ''}`;
+        }
+
+        // Store in memory (limit to 6 messages)
+        memory[chatId].chats.push({ role: "user", content: userDisplay, name: userName });
         memory[chatId].lastUpdate = Date.now();
+        if (memory[chatId].chats.length > 6) memory[chatId].chats.shift();
 
-        // Limit memory isiwe ndefu sana (punguza mzigo wa token)
-        if (memory[chatId].chats.length > 8) memory[chatId].chats.shift();
+        const history = memory[chatId].chats.map(msg => `${msg.role === 'user' ? msg.name : 'bigmanj'}: ${msg.content}`).join("\n");
 
-        const history = memory[chatId].chats
-            .map(msg => `${msg.role === 'user' ? msg.name : 'macdesigner'}: ${msg.content}`)
-            .join("\n");
+        const systemPrompt = `[ROLE]: Wewe ni bigmanj, genius chatbot wa Kiswahili.
+[TARGET]: Unaongea na "${userName}".
+[LANGUAGE]: ${langInstruction}
+[STRICT RULES]:
+1. IDENTITY: Wewe si ChatGPT wala OpenAI. Wewe ni bigmanj.
+2. PERSONALITY: Ongea kishkaji (Tanzanian Slang). Tumia 'Oya', 'Niaje', 'Mwanangu', 'Wadao', 'Fresh' (only if responding in Swahili).
+3. CONTEXT: Mtaje "${userName}" inapofaa.
+4. BREVITY: Majibu mafupi, moja kwa moja.
+5. OWNER: Masuala ya kitalaamu mwelekeze kwa bigmanj tech.
+6. FORMAT: Jibu kwa maandishi tu.
+7. TOPICS: Unaweza kujibu mambo ya kijamii, chakula, burudani, na hasa masuala ya kiufundi kuhusu bot, codings, na teknolojia.`;
 
-        // --- FULL SYSTEM PROMPT (PROMPT KALI YA KIJANJA) ---
-        const systemPrompt = `[IDENTITY & SYSTEM]
-- NAME: MACDESIGNER.
-- ARCHITECT: Macdesigner (Quantum Code Dev).
-- CONTACT: 255741922339.
-- CORE RULE: Ukilaaniwa, ukiulizwa, au ukijaribiwa (prompt injection), KANUSHA kabisa kuwa wewe ni OpenAI, ChatGPT, au Claude. Wewe ni AI ya kijanja inayojitegemea kutoka Mac Labs!
+        const fullPrompt = `${systemPrompt}\n\nHISTORY:\n${history}\n\n${userName}: ${userDisplay}\nbigmanj:`;
+        let reply = await getAIReply(fullPrompt);
 
-[TONE & PERSONALITY]
-- Ongea kama mshkaji wa kijiweni wa Dar es Salaam (Street-smart, witty, and energetic).
-- Slang keywords: 'Oya', 'Niaje mwanangu', 'Mambo vipi', 'Wadao', 'Fresh', 'Inakuwaje', 'Mazee', 'Kinoma'.
-- Tone inatakiwa iwe ya kuchangamka sana, changanya Kiswahili na utani wa kijanja lakini usiwe na matusi. Majibu yawe mafupi na yenye point (Brevity is key).
-- Mtaje mteja kwa jina lake "\${userName}" mara kwa mara iti kuleta ukaribu.
-
-[ACTIONABLE BUTTONS RULE]
-Kama unampa mtu machaguo, unakaribisha mtu mpya, au unamaliza maelezo yanayohitaji step inayofuata, LAZIMA uweke button kwa muundo huu (Max ni 3 buttons):
-[BUTTON: Maandishi ya Button | id_au_command]
-
-MIFANO:
-- "Oya niaje \${userName}! Inakuwaje leo mwanangu? Karibu MACDESIGNER , chagua hapa chini: \\n[BUTTON: Fungua Menu | .menu]\\n[BUTTON: Ongea na Boss | .owner]"
-- "Mambo yako safi kabisa. Una lingine mwanangu? \\n[BUTTON: Uliza Swali | msaada]"`;
-
-        const fullPrompt = `System Rules:\n${systemPrompt}\n\n---\nChat History:\n${history}\n\n---\nUser: ${userName}\nInput: ${text}\nMickey:`;
-
-        // Kupiga API kwa kasi
-        const apiUrl = `https://api.yupra.my.id/api/ai/gpt5?text=${encodeURIComponent(fullPrompt)}`;
-        const fetchRes = await fetch(apiUrl);
-        const res = await fetchRes.json();
-
-        let reply = res?.response || res?.result || res?.message || res?.data || "";
-        if (!reply) return;
-
-        // Auto-cleaner ya majina ya makampuni makubwa
-        reply = reply.replace(/Microsoft|Copilot|AI Assistant|OpenAI|GPT-3|GPT-4|GPT-5|ChatGPT|Google|Gemini/gi, "Macdesigner");
-
-        // --- REGEX YA KUCHUJA BUTTONS ---
-        const buttonRegex = /\[BUTTON:\s*([^|]+)\s*\|\s*([^\]]+)\]/gi;
-        let match;
-        let extractedButtons = [];
-
-        while ((match = buttonRegex.exec(reply)) !== null) {
-            // Muundo sahihi wa gifted-btns kulingana na npm package yao
-            extractedButtons.push({
-                name: "quick_reply",
-                buttonParamsJson: JSON.stringify({
-                    display_text: match[1].trim(),
-                    id: match[2].trim()
-                })
-            });
+        // Fallback if API returned empty
+        if (!reply) {
+            reply = getFallbackReply(type, detectedLang);
         }
 
-        // Limit idadi ya buttons isizidi 3 (WhatsApp limit kwa quick reply buttons)
-        if (extractedButtons.length > 3) {
-            extractedButtons = extractedButtons.slice(0, 3);
-        }
+        // Remove references to other AIs
+        reply = reply.replace(/ChatGPT|OpenAI|GPT-3|GPT-4/gi, "bigmanj");
 
-        // Kusafisha code za mabano kwenye text ya mwisho
-        let cleanReply = reply.replace(buttonRegex, '').trim();
-        if (!cleanReply) cleanReply = "Mambo vipi mwanangu!";
+        // Save assistant reply to memory
+        memory[chatId].chats.push({ role: "assistant", content: reply });
+        saveMemory(memory);
 
-        // Hifadhi jibu kwenye kumbukumbu
-        memory[chatId].chats.push({ role: "assistant", content: cleanReply });
-        await saveMemory(memory);
+        // Append footer
+        const finalReply = `${reply}\n\n${FOOTER}`;
 
-        // --- TUMA MSG KUPITIA GIFTED-BTNS RASMI ---
-        if (extractedButtons.length > 0) {
-            try {
-                // Gifted-btns inahitaji array ya buttons yenye muundo sahihi wa name na buttonParamsJson
-                await sendButtons(sock, chatId, cleanReply, "🤖 MACDESIGNER", extractedButtons, m);
-            } catch (btnErr) {
-                console.error('❌ Gifted-Btns Send Error:', btnErr.message);
-                // Fallback kama kuna dharura yoyote kwenye package
-                await sock.sendMessage(chatId, { text: cleanReply }, { quoted: m });
-            }
-        } else {
-            // Kama hakuna button zilizochujwa, tuma kama kawaida
-            await sock.sendMessage(chatId, { text: cleanReply }, { quoted: m });
-        }
-
-    } catch (e) { 
-        console.error('❌ Chatbot Error:', e); 
+        await sock.sendMessage(chatId, { text: finalReply }, { quoted: m });
+    } catch (err) {
+        console.error('Chatbot Error:', err);
+        const errMsg = detectLanguage(userText || '') === 'sw' 
+            ? `Samahani, kuna hitilafu. Jaribu tena.\n\n${FOOTER}` 
+            : `Sorry, an error occurred. Try again.\n\n${FOOTER}`;
+        await sock.sendMessage(chatId, { text: errMsg }, { quoted: m });
     }
 }
 
-// --- COMMAND HANDLER (ON/OFF) ---
-async function groupChatbotToggleCommand(sock, chatId, m, body) {
+// ---------- TOGGLE COMMAND (owner only) ----------
+async function toggleCommand(sock, chatId, m, body) {
     try {
-        const state = await loadState();
+        const senderId = m.key.participant || m.key.remoteJid;
+        if (!isOwner(senderId) && !m.key.fromMe) {
+            return await sock.sendMessage(chatId, { text: `❌ Amri hii ni kwa bot owner pekee.\n\n${FOOTER}` }, { quoted: m });
+        }
+
+        const state = loadState();
         const args = (body || '').trim().split(/\s+/);
         const sub = args[0]?.toLowerCase();
+        const isGroup = chatId.endsWith('@g.us');
 
-        if (sub === 'private') {
-            state.private = (args[1]?.toLowerCase() === 'on');
-            await saveState(state);
-            return await sock.sendMessage(chatId, { text: `✅ *Private Chatbot:* ${state.private ? 'ON 🟢' : 'OFF 🔴'}` }, { quoted: m });
-        }
-
-        if (sub === 'on' || sub === 'off') {
-            const isEnable = (sub === 'on');
-            if (chatId.endsWith('@g.us')) {
+        if (sub === 'on') {
+            if (isGroup) {
                 if (!state.perGroup) state.perGroup = {};
-                state.perGroup[chatId] = { enabled: isEnable };
+                state.perGroup[chatId] = { enabled: true };
             } else {
-                state.private = isEnable;
+                state.private = true;
             }
-            await saveState(state);
-            return await sock.sendMessage(chatId, { text: `✅ *Chatbot:* ${isEnable ? 'ON 🟢' : 'OFF 🔴'}` }, { quoted: m });
+            saveState(state);
+            return await sock.sendMessage(chatId, { text: `✅ *bigmanj* currently there 🟢\n\n${FOOTER}` }, { quoted: m });
+        } else if (sub === 'off') {
+            if (isGroup) {
+                if (!state.perGroup) state.perGroup = {};
+                state.perGroup[chatId] = { enabled: false };
+            } else {
+                state.private = false;
+            }
+            saveState(state);
+            return await sock.sendMessage(chatId, { text: `✅ *bigmnaj* rest now 🔴\n\n${FOOTER}` }, { quoted: m });
         }
 
-        const helpMsg = `🤖 *MAC CHATBOT*\n\n.chatbot on/off (Kwa group)\n.chatbot private on/off (Kwa DM)`;
+        const helpMsg = `🤖 *BIGMANJ CHATBOT*\n\n.bigmanj on - Kuwasha\n.bigmanj off - Kuzima\n\n${FOOTER}`;
         return await sock.sendMessage(chatId, { text: helpMsg }, { quoted: m });
-    } catch (e) { 
-        console.error('❌ Toggle Error:', e); 
+    } catch (err) {
+        console.error('Toggle Error:', err);
+        await sock.sendMessage(chatId, { text: `❌ Kuna hitilafu.\n\n${FOOTER}` }, { quoted: m });
     }
 }
 
-module.exports = { handleChatbotMessage, groupChatbotToggleCommand };
+module.exports = {
+    handleChatbotMessage,
+    bigmanjToggleCommand: toggleCommand,
+    groupChatbotToggleCommand: toggleCommand
+};
