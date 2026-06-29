@@ -1,5 +1,5 @@
 /**
- * halotel.js - Mickey Glitch Business AI (Super Stable Version)
+ * halotel.js - bigmanj  Business AI (Super Stable Version)
  * Kazi: Inatumia text-based commands kwa buttons ili kuhakikisha bot inajibu kila wakati.
  */
 
@@ -8,9 +8,9 @@ const axios = require('axios');
 
 const CONFIG = {
     PRICE_PER_GB: 1000,
-    SELLER_NUMBER: '255615944741@s.whatsapp.net',
+    SELLER_NUMBER: '255777580820@s.whatsapp.net',
     BANNER: 'https://files.catbox.moe/ljabyq.png',
-    FOOTER: '🚀 Powered by Mac designer Tech',
+    FOOTER: '🚀 Powered by Bigmanj Tech',
     PAYMENT_NO: '0615944741'
 };
 
@@ -24,7 +24,7 @@ const PACKAGES = [
 
 async function askMickeyBiz(query, userName, context = "") {
     try {
-        const bizPrompt = `Wewe ni Mac bzy AI. Unauza bando (1GB=1000). Mteja ni ${userName}. Jibu kishkaji sana (Bongo Slang).`;
+        const bizPrompt = `Wewe ni bigmanj Bzness AI. Unauza bando (1GB=1000). Mteja ni ${userName}. Jibu kishkaji sana (Bongo Slang).`;
         const res = await axios.get(`https://apiskeith.top/ai/gpt?q=${encodeURIComponent(bizPrompt + query)}`);
         return res.data.data || res.data.result || "Lipia bando mwanangu tuwashe mitambo.";
     } catch (e) { return "Nipo hapa! Lipia chap nikuwashie bando."; }
@@ -65,7 +65,7 @@ async function halotelCommand(sock, chatId, m, body = '') {
             ];
 
             return await sendInteractiveMessage(sock, chatId, {
-                text: `✨ *MAC BIZ - ODA YAKO*\n\n${aiInstruction}\n\n📊 *DATA:* ${gbValue}GB\n💰 *BEI:* TSh ${totalPrice.toLocaleString()}\n📌 *MTANDAO:* Halotel\n\nUkishalipa, tuma screenshot hapa chap! 🚀`,
+                text: `✨ *BIGMANj BZNESS - ODA YAKO*\n\n${aiInstruction}\n\n📊 *DATA:* ${gbValue}GB\n💰 *BEI:* TSh ${totalPrice.toLocaleString()}\n📌 *MTANDAO:* Halotel\n\nUkishalipa, tuma screenshot hapa chap! 🚀`,
                 footer: CONFIG.FOOTER,
                 interactiveButtons: paymentButtons
             }, { quoted: m });
@@ -99,7 +99,7 @@ async function halotelCommand(sock, chatId, m, body = '') {
         // 4. [AI CONVERSATION]
         if (input.length > 2 && !input.startsWith('.')) {
             const aiReply = await askMickeyBiz(input, userName);
-            return await sock.sendMessage(chatId, { text: `💼 *MICKEY BIZ:* ${aiReply}` }, { quoted: m });
+            return await sock.sendMessage(chatId, { text: `💼 *BIGMANj BZNESS:* ${aiReply}` }, { quoted: m });
         }
 
     } catch (e) {
