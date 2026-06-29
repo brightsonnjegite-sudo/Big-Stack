@@ -31,6 +31,8 @@ const compliments = [
     "Unafanya dunia kuwa mahali bora kwa kuwepo kwako."
 ];
 
+const FOOTER = '© bigmanj tech ™ with ♥︎';
+
 async function complimentCommand(sock, chatId, message) {
     try {
         if (!message || !chatId) {
@@ -51,7 +53,7 @@ async function complimentCommand(sock, chatId, message) {
         
         if (!userToCompliment) {
             await sock.sendMessage(chatId, { 
-                text: 'Tafadhali taja mtu au jibu ujumbe wao ili uweze kumpa sifa!'
+                text: `Tafadhali taja mtu au jibu ujumbe wao ili uweze kumpa sifa!\n\n${FOOTER}`
             });
             return;
         }
@@ -62,16 +64,16 @@ async function complimentCommand(sock, chatId, message) {
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         await sock.sendMessage(chatId, { 
-                text: `Habari @${userToCompliment.split('@')[0]}! ${compliment}`,
+            text: `✨ *Sifa ya Leo* ✨\n\nHabari @${userToCompliment.split('@')[0]}! ${compliment}\n\n${FOOTER}`,
             mentions: [userToCompliment]
         });
     } catch (error) {
         console.error('Error in compliment command:', error);
-            if (error.data === 429) {
+        if (error.data === 429) {
             await new Promise(resolve => setTimeout(resolve, 2000));
             try {
                 await sock.sendMessage(chatId, { 
-                    text: 'Tafadhali jaribu tena baada ya sekunde chache.'
+                    text: `Tafadhali jaribu tena baada ya sekunde chache.\n\n${FOOTER}`
                 });
             } catch (retryError) {
                 console.error('Error sending retry message:', retryError);
@@ -79,7 +81,7 @@ async function complimentCommand(sock, chatId, message) {
         } else {
             try {
                 await sock.sendMessage(chatId, { 
-                    text: 'Kosa limetokea wakati wa kutuma sifa. Jaribu tena baadaye.'
+                    text: `Kosa limetokea wakati wa kutuma sifa. Jaribu tena baadaye.\n\n${FOOTER}`
                 });
             } catch (sendError) {
                 console.error('Error sending error message:', sendError);
