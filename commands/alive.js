@@ -72,7 +72,7 @@ const aliveCommand = async (sock, chatId, msg) => {
 
         // -------- Build Message (footer included) --------
         const statusMessage = `
-🖥️  *BIGSTACK ENGINE STATUS*
+🖥️  *BigStack ENGINE STATUS*
 Hey, I'm alive! 🟢
 
 └── ▢ DATE      : ${dateStr}
