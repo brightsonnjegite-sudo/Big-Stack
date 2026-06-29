@@ -68,7 +68,7 @@ async function demoteCommand(sock, chatId, mentionedJids, message) {
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         const demotionMessage = 
-`└── ▢ 👑 *DEMOTION SUCCESSFUL*
+`└ ▢ 👑 *DEMOTION SUCCESSFUL*
 
 └── ▢ Action    : Demote
 └── ▢ Target    : ${usernames.join(', ')}
@@ -144,7 +144,7 @@ async function handleDemotionEvent(sock, groupId, participants, author) {
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         const demotionMessage = 
-`└── ▢ 👑 *DEMOTION SUCCESSFUL*
+`└ ▢ 👑 *DEMOTION SUCCESSFUL*
 
 └── ▢ Action    : Demote
 └── ▢ Target    : ${demotedUsernames.join(', ')}
