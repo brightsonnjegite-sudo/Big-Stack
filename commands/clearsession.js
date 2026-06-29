@@ -81,4 +81,4 @@ async function clearSessionCommand(sock, chatId, msg) {
     }
 }
 
-module.exports = clearSessionCommand; 
+module.exports = clearSessionCommand;
