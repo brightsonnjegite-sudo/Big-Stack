@@ -39,7 +39,7 @@ async function characterCommand(sock, chatId, message) {
         ];
 
         // Get 3-5 random traits
-        const numTraits = Math.floor(Math.random() * 3) + 3; // Random number between 3 and 5
+        const numTraits = Math.floor(Math.random() * 3) + 3;
         const selectedTraits = [];
         for (let i = 0; i < numTraits; i++) {
             const randomTrait = traits[Math.floor(Math.random() * traits.length)];
@@ -50,16 +50,20 @@ async function characterCommand(sock, chatId, message) {
 
         // Calculate random percentages for each trait
         const traitPercentages = selectedTraits.map(trait => {
-            const percentage = Math.floor(Math.random() * 41) + 60; // Random number between 60-100
-            return `${trait}: ${percentage}%`;
+            const percentage = Math.floor(Math.random() * 41) + 60;
+            return `└── ▢ ${trait}: ${percentage}%`;
         });
 
-        // Create character analysis message
-        const analysis = `🔮 *Character Analysis* 🔮\n\n` +
-            `👤 *User:* ${userToAnalyze.split('@')[0]}\n\n` +
-            `✨ *Key Traits:*\n${traitPercentages.join('\n')}\n\n` +
-            `🎯 *Overall Rating:* ${Math.floor(Math.random() * 21) + 80}%\n\n` +
-            `Note: This is a fun analysis and should not be taken seriously!`;
+        // Create character analysis message with └── ▢ lines
+        const analysis = 
+`🔮 *Character Analysis* 🔮
+
+└── ▢ *User:* @${userToAnalyze.split('@')[0]}
+└── ▢ *Key Traits:*
+${traitPercentages.join('\n')}
+└── ▢ *Overall Rating:* ${Math.floor(Math.random() * 21) + 80}%
+
+© bigmanj tech ™ with ♥︎`;
 
         // Send the analysis with the user's profile picture
         await sock.sendMessage(chatId, {
@@ -76,4 +80,4 @@ async function characterCommand(sock, chatId, message) {
     }
 }
 
-module.exports = characterCommand; 
+module.exports = characterCommand;
