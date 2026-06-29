@@ -78,9 +78,11 @@ async function emojimixCommand(sock, chatId, msg) {
         // Read the WebP file
         const stickerBuffer = fs.readFileSync(outputFile);
 
-        // Send the sticker
+        // Send the sticker with pack name
         await sock.sendMessage(chatId, { 
-            sticker: stickerBuffer 
+            sticker: stickerBuffer,
+            packname: '©Bigstack ™',
+            author: 'bigmanj tech'
         }, { quoted: msg });
 
         // Cleanup temp files
@@ -99,4 +101,4 @@ async function emojimixCommand(sock, chatId, msg) {
     }
 }
 
-module.exports = emojimixCommand; 
+module.exports = emojimixCommand;
