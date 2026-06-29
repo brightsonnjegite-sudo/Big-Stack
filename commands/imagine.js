@@ -11,20 +11,31 @@ async function imagineCommand(sock, chatId, message) {
         const imagePrompt = prompt.slice(8).trim();
         
         if (!imagePrompt) {
-            await sock.sendMessage(chatId, {
-                text: 'Please provide a prompt for the image generation.\nExample: .imagine a beautiful sunset over mountains'
-            }, {
-                quoted: message
-            });
+            const usageMessage = 
+`└── ▢ 🎨 *IMAGE GENERATION*
+
+└── ▢ Status  : ❌ Missing Prompt
+└── ▢ Usage   : .imagine <prompt>
+
+📌 Example: .imagine a beautiful sunset over mountains
+
+© bigmanj tech ™ with ♥︎`;
+            await sock.sendMessage(chatId, { text: usageMessage }, { quoted: message });
             return;
         }
 
-        // Send processing message
-        await sock.sendMessage(chatId, {
-            text: '🎨 Generating your image... Please wait.'
-        }, {
-            quoted: message
-        });
+        // Send processing message with style
+        const processingMessage = 
+`└── ▢ 🎨 *IMAGE GENERATION*
+
+└── ▢ Status  : ⏳ Generating...
+└── ▢ Prompt  : ${imagePrompt}
+└── ▢ Quality : High (Enhanced)
+
+📌 Please wait, this may take a few seconds.
+
+© bigmanj tech ™ with ♥︎`;
+        await sock.sendMessage(chatId, { text: processingMessage }, { quoted: message });
 
         // Enhance the prompt with quality keywords
         const enhancedPrompt = enhancePrompt(imagePrompt);
@@ -37,21 +48,34 @@ async function imagineCommand(sock, chatId, message) {
         // Convert response to buffer
         const imageBuffer = Buffer.from(response.data);
 
-        // Send the generated image
+        // Prepare styled caption with lines and footer
+        const caption = 
+`└── ▢ 🎨 *IMAGE GENERATED*
+
+└── ▢ Prompt  : ${imagePrompt}
+└── ▢ Status  : ✅ Success
+└── ▢ Quality : Enhanced
+
+📌 Here is your generated image.
+
+© bigmanj tech ™ with ♥︎`;
+
+        // Send the generated image with styled caption
         await sock.sendMessage(chatId, {
             image: imageBuffer,
-            caption: `🎨 Generated image for prompt: "${imagePrompt}"`
-        }, {
-            quoted: message
-        });
+            caption: caption
+        }, { quoted: message });
 
     } catch (error) {
         console.error('Error in imagine command:', error);
-        await sock.sendMessage(chatId, {
-            text: '❌ Failed to generate image. Please try again later.'
-        }, {
-            quoted: message
-        });
+        const errorMessage = 
+`└── ▢ 🎨 *IMAGE GENERATION*
+
+└── ▢ Status  : ❌ Error
+└── ▢ Details : ${error.message || 'Please try again later.'}
+
+© bigmanj tech ™ with ♥︎`;
+        await sock.sendMessage(chatId, { text: errorMessage }, { quoted: message });
     }
 }
 
@@ -81,4 +105,4 @@ function enhancePrompt(prompt) {
     return `${prompt}, ${selectedEnhancers.join(', ')}`;
 }
 
-module.exports = imagineCommand; 
+module.exports = imagineCommand;
