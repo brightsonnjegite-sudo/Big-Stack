@@ -5,7 +5,7 @@ const { isUserMuted, unmuteUser, setGroupSetting } = require('./mute');
 
 const FOOTER = '© bigmanj tech ™ with ♥︎';
 
-async function unmuteCommand(sock, chatId, senderId, message, args) {
+async function unmuteCommand(sock, chatId, senderId, message, args = []) {
     try {
         if (!chatId.endsWith('@g.us')) {
             return sock.sendMessage(chatId, { 
@@ -30,14 +30,16 @@ async function unmuteCommand(sock, chatId, senderId, message, args) {
             });
         }
 
-        // Parse target user
+        // Parse target user from mentioned JIDs or @tag in text
         let targetUser = null;
         const mentionedJids = message.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
         if (mentionedJids.length > 0) {
             targetUser = mentionedJids[0];
         } else {
-            for (const arg of args) {
-                if (arg.startsWith('@')) {
+            // Check if args is an array; if not, try to get from command text
+            const argsArray = Array.isArray(args) ? args : [];
+            for (const arg of argsArray) {
+                if (typeof arg === 'string' && arg.startsWith('@')) {
                     const num = arg.replace('@', '');
                     targetUser = num + '@s.whatsapp.net';
                     break;
@@ -57,9 +59,8 @@ async function unmuteCommand(sock, chatId, senderId, message, args) {
 
             let reply = `└── ▢ 🔊 *USER UNMUTED*\n\n`;
             reply += `└── ▢ User : @${targetUser.split('@')[0]}\n`;
-            reply += `└── ▢ Status : ✅ Successfully unmuted\n`;
+            reply += `└── ▢ Status : ✅ Unmuted\n`;
             reply += `└── ▢ Action : Messages will no longer be deleted\n\n${FOOTER}`;
-            
             await sock.sendMessage(chatId, { text: reply, mentions: [targetUser] });
         } else {
             // === UNMUTE GROUP (WhatsApp native: all members can send) ===
