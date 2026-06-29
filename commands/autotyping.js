@@ -1,5 +1,5 @@
 /**
- * Knight Bot - A WhatsApp Bot
+ * BigStack - A WhatsApp Bot
  * Autotyping Command - Shows fake typing status
  */
 
@@ -62,7 +62,7 @@ async function autotypingCommand(sock, chatId, message) {
         
         // Send confirmation message
         await sock.sendMessage(chatId, {
-            text: `✅ Auto-typing has been ${config.enabled ? 'enabled' : 'disabled'}!`
+            text: `✅ BigStark autotyping has been ${config.enabled ? 'enabled' : 'disabled'}!`
         });
         
     } catch (error) {
