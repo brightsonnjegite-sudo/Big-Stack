@@ -1,6 +1,8 @@
 const fs = require('fs/promises');
 const path = require('path');
 
+const FOOTER = '© bigmanj tech ™ with ♥︎';
+
 // PIN Configuration
 const CONFIG_FILE = path.join(__dirname, '../data/pinConfig.json');
 const DEFAULT_PIN = '0000';
@@ -67,7 +69,9 @@ async function pinCommand(sock, chatId, message, args = []) {
     // Only owner can configure PIN
     const isOwner = message.key.fromMe;
     if (!isOwner) {
-        await sock.sendMessage(chatId, { text: '⛔ Only bot owner can configure PIN' }, { quoted: message });
+        await sock.sendMessage(chatId, { 
+            text: `└── ▢ ⛔ *ACCESS DENIED*\n\n└── ▢ Only bot owner can configure PIN\n\n${FOOTER}` 
+        }, { quoted: message });
         return;
     }
 
@@ -77,7 +81,7 @@ async function pinCommand(sock, chatId, message, args = []) {
     if (cmd === 'on') {
         await savePinConfig({ ...config, enabled: true });
         await sock.sendMessage(chatId, { 
-            text: `🔒 *PIN Protection: ENABLED*\n\nAll commands now require PIN verification.\n\n📌 Default PIN: 0000\n\nUse: .pin 0000` 
+            text: `└── ▢ 🔒 *PIN PROTECTION ENABLED*\n\n└── ▢ Status : 🔒 ENABLED\n└── ▢ PIN     : ${config.pin}\n└── ▢ Note    : All commands now require PIN verification\n\n└── ▢ 📌 Use: .pin <your_pin> to verify\n\n${FOOTER}` 
         }, { quoted: message });
         return;
     }
@@ -87,7 +91,7 @@ async function pinCommand(sock, chatId, message, args = []) {
         await savePinConfig({ ...config, enabled: false });
         verifiedSessions.clear(); // Clear all sessions
         await sock.sendMessage(chatId, { 
-            text: `🔓 *PIN Protection: DISABLED*\n\nAll commands are now accessible without PIN.` 
+            text: `└── ▢ 🔓 *PIN PROTECTION DISABLED*\n\n└── ▢ Status : 🔓 DISABLED\n└── ▢ Note    : All commands are now accessible without PIN\n\n${FOOTER}` 
         }, { quoted: message });
         return;
     }
@@ -95,15 +99,19 @@ async function pinCommand(sock, chatId, message, args = []) {
     // .pin set <new_pin> - Set custom PIN
     if (cmd === 'set') {
         if (!args[1]) {
-            return sock.sendMessage(chatId, { text: '⚠️ Usage: .pin set <new_pin>' }, { quoted: message });
+            return sock.sendMessage(chatId, { 
+                text: `└── ▢ ⚠️ *USAGE ERROR*\n\n└── ▢ Usage : .pin set <new_pin>\n└── ▢ Example : .pin set 1234\n\n${FOOTER}` 
+            }, { quoted: message });
         }
         const newPin = args[1];
         if (newPin.length < 4) {
-            return sock.sendMessage(chatId, { text: '⚠️ PIN must be at least 4 characters' }, { quoted: message });
+            return sock.sendMessage(chatId, { 
+                text: `└── ▢ ⚠️ *PIN TOO SHORT*\n\n└── ▢ PIN must be at least 4 characters\n\n${FOOTER}` 
+            }, { quoted: message });
         }
         await savePinConfig({ ...config, pin: newPin });
         await sock.sendMessage(chatId, {
-            text: `✅ *PIN Updated!*\n\n🔐 New PIN: ${newPin}`
+            text: `└── ▢ ✅ *PIN UPDATED*\n\n└── ▢ New PIN : ${newPin}\n└── ▢ Status : ✅ Success\n\n${FOOTER}`
         }, { quoted: message });
         return;
     }
@@ -112,7 +120,7 @@ async function pinCommand(sock, chatId, message, args = []) {
     if (cmd === 'status') {
         const status = config.enabled ? '🔒 ENABLED' : '🔓 DISABLED';
         await sock.sendMessage(chatId, {
-            text: `🔐 *PIN Security Status*\n\nProtection: ${status}\nCurrent PIN: ${config.pin}`
+            text: `└── ▢ 🔐 *PIN SECURITY STATUS*\n\n└── ▢ Protection : ${status}\n└── ▢ PIN        : ${config.pin}\n\n${FOOTER}`
         }, { quoted: message });
         return;
     }
@@ -120,18 +128,14 @@ async function pinCommand(sock, chatId, message, args = []) {
     // Show help if no args
     if (!cmd) {
         await sock.sendMessage(chatId, {
-            text: `🔐 *PIN Security System*\n\n` +
-                  `Status: ${config.enabled ? '🔒 ENABLED' : '🔓 DISABLED'}\n\n` +
-                  `Commands:\n` +
-                  `  .pin on      - Enable PIN protection\n` +
-                  `  .pin off     - Disable PIN protection\n` +
-                  `  .pin set <new>  - Set custom PIN\n` +
-                  `  .pin status  - Show PIN status`
+            text: `└── ▢ 🔐 *PIN SECURITY SYSTEM*\n\n└── ▢ Status : ${config.enabled ? '🔒 ENABLED' : '🔓 DISABLED'}\n└── ▢ PIN    : ${config.pin}\n\n└── ▢ *Commands:*\n└── ▢   .pin on        - Enable PIN protection\n└── ▢   .pin off       - Disable PIN protection\n└── ▢   .pin set <pin> - Set custom PIN\n└── ▢   .pin status    - Show PIN status\n\n${FOOTER}`
         }, { quoted: message });
         return;
     }
 
-    await sock.sendMessage(chatId, { text: '❓ Unknown command. Use .pin for help' }, { quoted: message });
+    await sock.sendMessage(chatId, { 
+        text: `└── ▢ ❓ *UNKNOWN COMMAND*\n\n└── ▢ Use .pin for help\n\n${FOOTER}` 
+    }, { quoted: message });
 }
 
 // ────────────────────────────────────────────
@@ -144,7 +148,7 @@ async function verifyPinCommand(sock, chatId, message, pinInput) {
     if (!config.enabled) {
         setUserVerified(senderId);
         await sock.sendMessage(chatId, { 
-            text: '✅ Access granted (PIN disabled)' 
+            text: `└── ▢ ✅ *ACCESS GRANTED*\n\n└── ▢ Status : 🔓 PIN Disabled\n└── ▢ Access : ✅ Granted\n\n${FOOTER}` 
         }, { quoted: message });
         return true;
     }
@@ -155,12 +159,12 @@ async function verifyPinCommand(sock, chatId, message, pinInput) {
         setUserVerified(senderId);
         const expiryTime = new Date(Date.now() + VERIFICATION_DURATION).toLocaleTimeString();
         await sock.sendMessage(chatId, { 
-            text: `✅ *PIN Verified!*\n\n🟢 Access Granted\n⏰ Valid until: ${expiryTime}` 
+            text: `└── ▢ ✅ *PIN VERIFIED*\n\n└── ▢ Status : ✅ ACCESS GRANTED\n└── ▢ Valid  : Until ${expiryTime}\n└── ▢ Note   : Session valid for 1 hour\n\n${FOOTER}` 
         }, { quoted: message });
         return true;
     } else {
         await sock.sendMessage(chatId, { 
-            text: `❌ *Wrong PIN!*\n\n🔴 Access Denied\n\n🔐 Try again with correct PIN` 
+            text: `└── ▢ ❌ *WRONG PIN*\n\n└── ▢ Status : 🔴 ACCESS DENIED\n└── ▢ Note   : Try again with correct PIN\n\n${FOOTER}` 
         }, { quoted: message });
         return false;
     }
