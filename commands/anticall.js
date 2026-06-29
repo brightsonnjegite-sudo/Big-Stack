@@ -61,7 +61,7 @@ async function anticallCommand(sock, chatId, message, args) {
         const statusText = 
 `*[ ANTICALL STATUS ]*
 
-*🤖 BIGMANJ BOT V3* 
+*🤖 BigStack* 
 *by ~© bigmanj tech ™~* 
 Calls: ${state.enabled ? 'BLOCKED ✅' : 'ALLOWED ❌'}
 Messages: ALLOWED ✅
@@ -94,7 +94,7 @@ async function sendCallPolicyMessage(sock, toJid, callerNumber, callCount) {
     let policyMsg;
     if (callCount === 1) {
         policyMsg = 
-`*🤖 BIGMANJ BOT V3* 
+`*🤖 BigStack* 
 by *~© bigmanj tech ™~*
 
 *– Voice Call Policy*
