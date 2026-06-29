@@ -223,6 +223,42 @@ async function handleMessages(sock, messageUpdate, printLog) {
                     await sock.sendMessage(chatId, {
                         text: `🔗 *Support Group*\n\nJoin our support community:\nhttps://chat.whatsapp.com/GA4WrOFythU6g3BFVubYM7?mode=wwt`
                     }, { quoted: message });
+                },
+                // ✅ ADDED: Team Support button handler
+                'team_support': async () => {
+                    try {
+                        const menuModule = require('./commands/menu');
+                        if (menuModule.buttonHandlers && menuModule.buttonHandlers.team_support) {
+                            await menuModule.buttonHandlers.team_support(sock, chatId, message);
+                        } else {
+                            await sock.sendMessage(chatId, {
+                                text: `👥 *Team Support*\n\nJoin our support community:\n🔗 https://chat.whatsapp.com/GA4WrOFythU6g3BFVubYM7\n\n📌 Contact Owner:\n📱 wa.me/255777580820`
+                            }, { quoted: message });
+                        }
+                    } catch (e) {
+                        console.error('Team support handler error:', e);
+                        await sock.sendMessage(chatId, {
+                            text: `👥 *Team Support*\n\nJoin our support community:\n🔗 https://chat.whatsapp.com/GA4WrOFythU6g3BFVubYM7`
+                        }, { quoted: message });
+                    }
+                },
+                // ✅ ADDED: Buy Bot button handler
+                'buy_bot': async () => {
+                    try {
+                        const menuModule = require('./commands/menu');
+                        if (menuModule.buttonHandlers && menuModule.buttonHandlers.buy_bot) {
+                            await menuModule.buttonHandlers.buy_bot(sock, chatId, message);
+                        } else {
+                            await sock.sendMessage(chatId, {
+                                text: `💎 *Buy Bot Script*\n\nProduct: SC Zero-Tr4sh\nPrice: Tsh 35.000 (was 45.000)\n\nContact owner: wa.me/255719632816`
+                            }, { quoted: message });
+                        }
+                    } catch (e) {
+                        console.error('Buy bot handler error:', e);
+                        await sock.sendMessage(chatId, {
+                            text: `💎 *Buy Bot Script*\n\nContact owner: wa.me/255719632816`
+                        }, { quoted: message });
+                    }
                 }
             };
 
@@ -287,6 +323,22 @@ async function handleMessages(sock, messageUpdate, printLog) {
                     },
                     'support': async () => {
                         await sock.sendMessage(chatId, { text: '🔗 *Support Group*\n\nJoin our support community:\nhttps://chat.whatsapp.com/GA4WrOFythU6g3BFVubYM7?mode=wwt' }, { quoted: message });
+                    },
+                    'team_support': async () => {
+                        try {
+                            const menuModule = require('./commands/menu');
+                            if (menuModule.buttonHandlers && menuModule.buttonHandlers.team_support) {
+                                await menuModule.buttonHandlers.team_support(sock, chatId, message);
+                            }
+                        } catch (e) {}
+                    },
+                    'buy_bot': async () => {
+                        try {
+                            const menuModule = require('./commands/menu');
+                            if (menuModule.buttonHandlers && menuModule.buttonHandlers.buy_bot) {
+                                await menuModule.buttonHandlers.buy_bot(sock, chatId, message);
+                            }
+                        } catch (e) {}
                     }
                 };
 
