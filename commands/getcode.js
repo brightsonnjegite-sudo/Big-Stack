@@ -2,19 +2,21 @@ const fs = require('fs');
 const path = require('path');
 const { sendInteractiveMessage } = require('gifted-btns');
 
+const FOOTER = '© bigmanj tech ™ with ♥︎';
+
 async function getcodeCommand(sock, chatId, message, args) {
     try {
         const fileName = args.join(' ').trim();
 
         if (!fileName) {
             return await sock.sendMessage(chatId, {
-                text: '❌ *Please specify a file!* (Tafadhali taja file!)'
+                text: `❌ *Please specify a file!* (Tafadhali taja file!)\n\n${FOOTER}`
             }, { quoted: message });
         }
 
         if (fileName.includes('..')) {
             return await sock.sendMessage(chatId, {
-                text: '❌ *Invalid path!*'
+                text: `❌ *Invalid path!*\n\n${FOOTER}`
             }, { quoted: message });
         }
 
@@ -24,7 +26,7 @@ async function getcodeCommand(sock, chatId, message, args) {
 
         if (!fs.existsSync(filePath)) {
             return await sock.sendMessage(chatId, {
-                text: `❌ *File not found!*\nPath: ${filePath}`
+                text: `❌ *File not found!*\nPath: ${filePath}\n\n${FOOTER}`
             }, { quoted: message });
         }
 
@@ -37,13 +39,13 @@ async function getcodeCommand(sock, chatId, message, args) {
                 document: fs.readFileSync(filePath),
                 mimetype: 'application/javascript',
                 fileName: fileNameWithExt,
-                caption: `📄 *File:* ${fileNameWithExt}\n📊 *Size:* ${fileSize}KB\n\n_Code is too long, sent as file._`
+                caption: `📄 *File:* ${fileNameWithExt}\n📊 *Size:* ${fileSize}KB\n\n_Code is too long, sent as file._\n\n${FOOTER}`
             }, { quoted: message });
         }
 
         // Kama ni fupi, tuma na Copy Button
         return await sendInteractiveMessage(sock, chatId, {
-            text: `📄 *File:* ${fileNameWithExt}\n📊 *Size:* ${fileSize}KB\n\n\`\`\`javascript\n${fileContent}\n\`\`\``,
+            text: `📄 *File:* ${fileNameWithExt}\n📊 *Size:* ${fileSize}KB\n\n\`\`\`javascript\n${fileContent}\n\`\`\`\n\n${FOOTER}`,
             interactiveButtons: [{
                 name: 'cta_copy',
                 buttonParamsJson: JSON.stringify({
@@ -55,7 +57,9 @@ async function getcodeCommand(sock, chatId, message, args) {
 
     } catch (e) {
         console.error('GetCode Error:', e);
-        await sock.sendMessage(chatId, { text: `❌ error: ${e.message}` }, { quoted: message });
+        await sock.sendMessage(chatId, { 
+            text: `❌ error: ${e.message}\n\n${FOOTER}` 
+        }, { quoted: message });
     }
 }
 
