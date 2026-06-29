@@ -757,7 +757,8 @@ async function handleMessages(sock, messageUpdate, printLog) {
                 }
                 commandExecuted = true;
                 break;
-            case userMessage.startsWith('.chatbot'):
+            // ✅ CHANGED: .chatbot -> .bigmanj
+            case userMessage.startsWith('.bigmanj'):
                 {
                     const args = userMessage.split(' ').slice(1).join(' ');
                     await groupChatbotToggleCommand(sock, chatId, message, args);
