@@ -10,9 +10,14 @@ async function blurCommand(sock, chatId, message, quotedMessage) {
         if (quotedMessage) {
             // If replying to a message
             if (!quotedMessage.imageMessage) {
-                await sock.sendMessage(chatId, { 
-                    text: '❌ Please reply to an image message' 
-                }, { quoted: message });
+                const errorMsg = 
+`└── ▢ 🖼️ *BLUR EFFECT*
+
+└── ▢ Status  : ❌ Error
+└── ▢ Details : Please reply to an image message
+
+© bigmanj tech ™ with ♥︎`;
+                await sock.sendMessage(chatId, { text: errorMsg }, { quoted: message });
                 return;
             }
             
@@ -37,38 +42,57 @@ async function blurCommand(sock, chatId, message, quotedMessage) {
                 { }
             );
         } else {
-            await sock.sendMessage(chatId, { 
-                text: '❌ Please reply to an image or send an image with caption .blur' 
-            }, { quoted: message });
+            const usageMsg = 
+`└── ▢ 🖼️ *BLUR EFFECT*
+
+└── ▢ Status  : ❌ Missing Image
+└── ▢ Usage   : Reply to an image with .blur
+└── ▢ Example : Send image with caption .blur
+
+© bigmanj tech ™ with ♥︎`;
+            await sock.sendMessage(chatId, { text: usageMsg }, { quoted: message });
             return;
         }
 
         // Resize and optimize image
         const resizedImage = await sharp(imageBuffer)
-            .resize(800, 800, { // Resize to max 800x800
+            .resize(800, 800, {
                 fit: 'inside',
                 withoutEnlargement: true
             })
-            .jpeg({ quality: 80 }) // Convert to JPEG with 80% quality
+            .jpeg({ quality: 80 })
             .toBuffer();
 
         // Apply blur effect directly using sharp
         const blurredImage = await sharp(resizedImage)
-            .blur(10) // Blur radius of 10
+            .blur(10)
             .toBuffer();
 
-        // Send the blurred image
+        // Send the blurred image with styled caption
+        const caption = 
+`└── ▢ 🖼️ *BLUR EFFECT*
+
+└── ▢ Status  : ✅ Success
+└── ▢ Effect  : Blur (radius 10)
+
+© bigmanj tech ™ with ♥︎`;
+
         await sock.sendMessage(chatId, {
             image: blurredImage,
-            caption: '*[ ✔ ] Image Blurred Successfully*'
+            caption: caption
         }, { quoted: message });
 
     } catch (error) {
         console.error('Error in blur command:', error);
-        await sock.sendMessage(chatId, { 
-            text: '❌ Failed to blur image. Please try again later.' 
-        }, { quoted: message });
+        const errorMsg = 
+`└── ▢ 🖼️ *BLUR EFFECT*
+
+└── ▢ Status  : ❌ Error
+└── ▢ Details : ${error.message || 'Please try again later.'}
+
+© bigmanj tech ™ with ♥︎`;
+        await sock.sendMessage(chatId, { text: errorMsg }, { quoted: message });
     }
 }
 
-module.exports = blurCommand; 
+module.exports = blurCommand;
