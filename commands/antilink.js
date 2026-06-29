@@ -117,7 +117,7 @@ async function handleLinkDetection(sock, chatId, message, userMessage, senderId)
         if (warningCount >= WARN_COUNT) {
             const kickMsg = `💀 *YOU HAVE BEEN REMOVED* 💀\n\n` +
                 `@${mention} you ignored ${WARN_COUNT} warnings and kept posting links.\n\n` +
-                `😈 *Bigmanj Antilink* does not tolerate rule breaking.\n\n` +
+                `😈 *BigStack Antilink* does not tolerate rule breaking.\n\n` +
                 `You are now EXPELLED from this group.\n\n` +
                 FOOTER;
             await sock.sendMessage(chatId, { text: kickMsg, mentions: [senderId] });
@@ -131,7 +131,7 @@ async function handleLinkDetection(sock, chatId, message, userMessage, senderId)
             const warnMsg = `🚫 *🔥 ANTILINK WARNING ${warningCount}/${WARN_COUNT} 🔥*\n\n` +
                 `@${mention} you have posted a forbidden link!\n\n` +
                 `😨 *This is warning ${warningCount} of ${WARN_COUNT}.* Next violation will get you REMOVED.\n\n` +
-                `*Bigmanj Security System* – ACTIVE and FEARFUL 🔪\n` +
+                `*BigStack Security System* – ACTIVE and FEARFUL 🔪\n` +
                 FOOTER;
             await sock.sendMessage(chatId, { text: warnMsg, mentions: [senderId] });
         }
