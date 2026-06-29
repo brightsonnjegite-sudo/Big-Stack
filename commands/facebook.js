@@ -1,5 +1,7 @@
 const axios = require('axios');
 
+const FOOTER = '© bigmanj tech ™ with ♥︎';
+
 /**
  * Try Hansa API for Facebook downloads
  */
@@ -42,7 +44,9 @@ async function facebookCommand(sock, chatId, message) {
         const url = text.split(' ').slice(1).join(' ').trim();
 
         if (!url || !url.includes('facebook.com')) {
-            return await sock.sendMessage(chatId, { text: '❌ Weka link ya Facebook. Mfano: .fb https://fb.watch/xyz' }, { quoted: message });
+            return await sock.sendMessage(chatId, { 
+                text: `❌ Weka link ya Facebook. Mfano: .fb https://fb.watch/xyz\n\n${FOOTER}` 
+            }, { quoted: message });
         }
 
         await sock.sendMessage(chatId, { react: { text: '⏳', key: message.key } });
@@ -69,7 +73,9 @@ async function facebookCommand(sock, chatId, message) {
             try {
                 videoData = await tryHansaAPI(url);
             } catch (hansaError) {
-                return await sock.sendMessage(chatId, { text: '❌ API zote zimeshindwa. Jaribu tena baadaye.' }, { quoted: message });
+                return await sock.sendMessage(chatId, { 
+                    text: `❌ API zote zimeshindwa. Jaribu tena baadaye.\n\n${FOOTER}` 
+                }, { quoted: message });
             }
         }
 
@@ -78,7 +84,9 @@ async function facebookCommand(sock, chatId, message) {
         const thumbnail = videoData.thumbnail;
 
         if (!videoUrl) {
-            return await sock.sendMessage(chatId, { text: '❌ Imeshindwa kupata link ya kupakua.' }, { quoted: message });
+            return await sock.sendMessage(chatId, { 
+                text: `❌ Imeshindwa kupata link ya kupakua.\n\n${FOOTER}` 
+            }, { quoted: message });
         }
 
         await sock.sendMessage(chatId, { react: { text: '📥', key: message.key } });
@@ -88,10 +96,12 @@ async function facebookCommand(sock, chatId, message) {
             await sock.sendMessage(chatId, {
                 video: { url: videoUrl },
                 mimetype: 'video/mp4',
-                caption: `✅ *Facebook Video Downloader*\n\n*Title:* ${title}`
+                caption: `✅ *Facebook Video Downloader*\n\n*Title:* ${title}\n\n${FOOTER}`
             }, { quoted: message });
         } catch (err) {
-            await sock.sendMessage(chatId, { text: '🚨 *Hitilafu ya kutuma!* Jaribu tena baadae.' });
+            await sock.sendMessage(chatId, { 
+                text: `🚨 *Hitilafu ya kutuma!* Jaribu tena baadae.\n\n${FOOTER}` 
+            });
             return;
         }
 
@@ -99,7 +109,9 @@ async function facebookCommand(sock, chatId, message) {
 
     } catch (err) {
         console.error("FB ERROR:", err.message);
-        await sock.sendMessage(chatId, { text: '🚨 *Hitilafu!* Jaribu tena baadae.' });
+        await sock.sendMessage(chatId, { 
+            text: `🚨 *Hitilafu!* Jaribu tena baadae.\n\n${FOOTER}` 
+        });
     }
 }
 
