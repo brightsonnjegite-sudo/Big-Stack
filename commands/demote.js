@@ -67,11 +67,18 @@ async function demoteCommand(sock, chatId, mentionedJids, message) {
         // Add delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        const demotionMessage = `*『 GROUP DEMOTION 』*\n\n` +
-            `👤 *Demoted User${userToDemote.length > 1 ? 's' : ''}:*\n` +
-            `${usernames.map(name => `• ${name}`).join('\n')}\n\n` +
-            `👑 *Demoted By:* @${message.key.participant ? message.key.participant.split('@')[0] : message.key.remoteJid.split('@')[0]}\n\n` +
-            `📅 *Date:* ${new Date().toLocaleString()}`;
+        const demotionMessage = 
+`└── ▢ 👑 *DEMOTION SUCCESSFUL*
+
+└── ▢ Action    : Demote
+└── ▢ Target    : ${usernames.join(', ')}
+└── ▢ Status    : ✅ Success
+└── ▢ Role      : Member (was Admin)
+└── ▢ Performed : Admin (@${message.key.participant ? message.key.participant.split('@')[0] : message.key.remoteJid.split('@')[0]})
+
+📌 ${usernames.join(', ')} has been demoted from admin.
+
+© bigmanj tech ™ with ♥︎`;
         
         await sock.sendMessage(chatId, { 
             text: demotionMessage,
@@ -136,11 +143,18 @@ async function handleDemotionEvent(sock, groupId, participants, author) {
         // Add delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        const demotionMessage = `*『 GROUP DEMOTION 』*\n\n` +
-            `👤 *Demoted User${participants.length > 1 ? 's' : ''}:*\n` +
-            `${demotedUsernames.map(name => `• ${name}`).join('\n')}\n\n` +
-            `👑 *Demoted By:* ${demotedBy}\n\n` +
-            `📅 *Date:* ${new Date().toLocaleString()}`;
+        const demotionMessage = 
+`└── ▢ 👑 *DEMOTION SUCCESSFUL*
+
+└── ▢ Action    : Demote
+└── ▢ Target    : ${demotedUsernames.join(', ')}
+└── ▢ Status    : ✅ Success
+└── ▢ Role      : Member (was Admin)
+└── ▢ Performed : ${demotedBy}
+
+📌 ${demotedUsernames.join(', ')} has been demoted from admin.
+
+© bigmanj tech ™ with ♥︎`;
         
         await sock.sendMessage(groupId, {
             text: demotionMessage,
