@@ -1,5 +1,5 @@
 /**
- * 🤖 BIGSTACK - MAIN HANDLER WITH MANUAL IMPORTS ONLY
+ * 🤖 BigStack - MAIN HANDLER WITH MANUAL IMPORTS ONLY
  * Clean & Optimized Version - No Auto-Loading
  */
 
