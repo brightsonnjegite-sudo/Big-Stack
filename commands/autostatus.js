@@ -9,7 +9,8 @@ const DEFAULT_CONFIG = Object.freeze({
     likeEnabled: true,
 });
 
-const EMOJI_REACTIONS = ['❤️', '🔥', '😂', '😱', '👍', '🎉', '😍', '💯', '🙏', '😢', '🤔', '😁'];
+// 🎯 ONLY THESE THREE EMOJIS – serious reactions
+const EMOJI_REACTIONS = ['💚', '🤍', '🖤'];
 
 let configCache = null;
 const processedStatusIds = new Set();
@@ -24,7 +25,6 @@ async function loadConfig() {
         await saveConfig(configCache);
     }
 
-    // Backward compatibility: if enabled is not set, derive from features.
     if (typeof configCache.enabled !== 'boolean') {
         configCache.enabled = true;
     }
@@ -46,7 +46,7 @@ function getRandomEmoji() {
     return EMOJI_REACTIONS[Math.floor(Math.random() * EMOJI_REACTIONS.length)];
 }
 
-// AUTO VIEW - Sasa ni HARAKA (Immediate)
+// AUTO VIEW – Immediate
 async function autoView(sock, statusKey) {
     if (!statusKey?.id) return;
     try {
@@ -56,7 +56,7 @@ async function autoView(sock, statusKey) {
     }
 }
 
-// AUTO LIKE - Sasa ni HARAKA (Immediate)
+// AUTO LIKE – Immediate (uses only 💚🤍🖤)
 async function autoLike(sock, statusKey) {
     if (!statusKey?.id || !statusKey?.participant) return;
 
@@ -93,7 +93,6 @@ async function handleStatusUpdate(sock, ev) {
     
     processedStatusIds.add(statusKey.id);
 
-    // Limit memory
     if (processedStatusIds.size > 1500) {
         const arr = Array.from(processedStatusIds);
         processedStatusIds.clear();
@@ -116,32 +115,42 @@ async function autoStatusCommand(sock, chatId, msg, args = []) {
         const sub = (args[0] || '').toLowerCase();
         const option = (args[1] || '').toLowerCase();
 
+        // --- Global ON ---
         if (sub === 'on') {
             await saveConfig({ enabled: true, viewEnabled: true, likeEnabled: true });
-            return sock.sendMessage(chatId, { text: '✅ *Auto Status:* Enabled (view + like).' });
+            return sock.sendMessage(chatId, { text: '✅ *BIGMANJ BOT V3 will view +like and like all status to reduce jam*' });
         }
 
+        // --- Global OFF ---
         if (sub === 'off') {
             await saveConfig({ enabled: false });
             return sock.sendMessage(chatId, { text: '❌ *Auto Status:* Disabled.' });
         }
 
+        // --- VIEW toggle (also enables LIKE automatically when turning ON) ---
         if (sub === 'view') {
-            if (option === 'on' || option === 'off') {
-                const enabledValue = option === 'on';
-                await saveConfig({ viewEnabled: enabledValue, enabled: enabledValue || (await loadConfig()).likeEnabled });
-                return sock.sendMessage(chatId, { text: `✅ *Auto Status View:* ${enabledValue ? 'ON' : 'OFF'}` });
+            if (option === 'on') {
+                await saveConfig({ viewEnabled: true, likeEnabled: true, enabled: true });
+                // 🎯 Custom reply as requested
+                return sock.sendMessage(chatId, { text: '✅ *BigStack will view +like status to reduce jam*' });
+            } else if (option === 'off') {
+                await saveConfig({ viewEnabled: false });
+                return sock.sendMessage(chatId, { text: '❌ *Auto Status View:* OFF (like still works if enabled separately).' });
             }
         }
 
+        // --- LIKE toggle (independent) ---
         if (sub === 'like') {
-            if (option === 'on' || option === 'off') {
-                const enabledValue = option === 'on';
-                await saveConfig({ likeEnabled: enabledValue, enabled: enabledValue || (await loadConfig()).viewEnabled });
-                return sock.sendMessage(chatId, { text: `✅ *Auto Status Like:* ${enabledValue ? 'ON' : 'OFF'}` });
+            if (option === 'on') {
+                await saveConfig({ likeEnabled: true, enabled: true });
+                return sock.sendMessage(chatId, { text: '✅ *Auto Status Like:* ON (only likes, no view).' });
+            } else if (option === 'off') {
+                await saveConfig({ likeEnabled: false });
+                return sock.sendMessage(chatId, { text: '❌ *Auto Status Like:* OFF.' });
             }
         }
 
+        // --- Show current status ---
         const cfg = await loadConfig();
         const overall = cfg.enabled ? 'ON' : 'OFF';
         const view = cfg.viewEnabled ? 'ON' : 'OFF';
@@ -153,7 +162,10 @@ async function autoStatusCommand(sock, chatId, msg, args = []) {
 • View: ${view}
 • Like: ${like}
 
-Use .autostatus on|off|view on|off|like on|off`,
+Commands:
+• .autostatus on|off
+• .autostatus view on|off   → view on also enables like
+• .autostatus like on|off`,
         });
 
     } catch (err) {
