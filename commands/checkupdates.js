@@ -1,10 +1,16 @@
-const updateCommand = require('./update');
 const isOwnerOrSudo = require('../lib/isOwner');
 const fs = require('fs/promises');
 const path = require('path');
+const axios = require('axios');
+const crypto = require('crypto');
 
-// Auto-reminder config
+// Configuration
 const REMINDER_FILE = path.join(__dirname, '../data/updateReminder.json');
+const VERSION_FILE = path.join(__dirname, '../data/currentVersion.json');
+const LOCAL_MANIFEST_FILE = path.join(__dirname, '../data/localManifest.json');
+const REPO_OWNER = 'brightsonnjegite-sudo';
+const REPO_NAME = 'Mickey-Glitch';
+
 let reminderCache = null;
 
 async function loadReminder() {
@@ -13,7 +19,7 @@ async function loadReminder() {
         const data = await fs.readFile(REMINDER_FILE, 'utf8');
         reminderCache = JSON.parse(data);
     } catch {
-        reminderCache = { lastCheck: null, updateFound: false, updateHash: null };
+        reminderCache = { lastCheck: null, updateFound: false, updateHash: null, autoReminder: false };
         await saveReminder();
     }
     return reminderCache;
@@ -28,173 +34,309 @@ async function saveReminder() {
     }
 }
 
-// Calculate hash to detect if update is new
-function generateUpdateHash(files, mode) {
-    const summary = `${mode}:${files.length}:${files.slice(0, 3).join(',')}`;
-    return Buffer.from(summary).toString('base64');
+// ========== SCAN ALL FILES & FOLDERS ==========
+async function scanAllFiles(rootDir) {
+    const ignoreDirs = new Set([
+        'node_modules', '.git', 'data', 'auth_info', 'tmp', 'logs',
+        'session', 'cache', 'uploads', 'temp', 'assets', 'public'
+    ]);
+    const ignoreFiles = new Set([
+        '.env', '.DS_Store', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
+        'thumbs.db', 'desktop.ini', '.gitignore', '.gitattributes', '.editorconfig'
+    ]);
+    const includeExtensions = new Set([
+        '.js', '.json', '.md', '.txt', '.example', '.yml', '.yaml',
+        '.html', '.css', '.xml', '.svg', '.ico', '.png', '.jpg', '.jpeg',
+        '.gif', '.webp', '.ttf', '.otf', '.woff', '.woff2', '.eot',
+        '.sh', '.bat', '.cmd', '.ps1', '.py', '.rb', '.go', '.java', '.c', '.cpp'
+    ]);
+    // Always include these specific files even if extension not in list
+    const alwaysInclude = new Set([
+        'Procfile', '.env.example', 'Dockerfile', 'config', 'settings',
+        'package.json', 'tsconfig.json', 'webpack.config.js', 'rollup.config.js'
+    ]);
+
+    const fileList = [];
+
+    async function walk(dir) {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (ignoreDirs.has(entry.name)) continue;
+            if (ignoreFiles.has(entry.name)) continue;
+            if (entry.isDirectory()) {
+                await walk(fullPath);
+            } else if (entry.isFile()) {
+                const ext = path.extname(entry.name);
+                const shouldInclude = includeExtensions.has(ext) || alwaysInclude.has(entry.name);
+                if (shouldInclude) {
+                    fileList.push(fullPath);
+                }
+            }
+        }
+    }
+
+    await walk(rootDir);
+    return fileList;
 }
 
-// Format file changes into readable info
-function categorizeChanges(files) {
-    const categories = {
-        commands: [],
-        core: [],
-        lib: [],
-        other: []
+// ========== COMPUTE MANIFEST (hash, size, mtime) ==========
+async function computeManifest(files) {
+    const manifest = {};
+    for (const file of files) {
+        try {
+            const stat = await fs.stat(file);
+            // Read file content to compute hash
+            const content = await fs.readFile(file);
+            const hash = crypto.createHash('sha256').update(content).digest('hex');
+            manifest[file] = {
+                hash,
+                size: stat.size,
+                mtime: stat.mtimeMs
+            };
+        } catch {
+            // skip
+        }
+    }
+    return manifest;
+}
+
+// ========== LOAD STORED MANIFEST ==========
+async function loadStoredManifest() {
+    try {
+        const data = await fs.readFile(LOCAL_MANIFEST_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch {
+        return null;
+    }
+}
+
+async function saveManifest(manifest) {
+    await fs.mkdir(path.dirname(LOCAL_MANIFEST_FILE), { recursive: true });
+    await fs.writeFile(LOCAL_MANIFEST_FILE, JSON.stringify(manifest, null, 2));
+}
+
+// ========== CHECK LOCAL CHANGES (LIST CHANGED FILES) ==========
+async function checkLocalChanges() {
+    const rootDir = path.join(__dirname, '..');
+    const files = await scanAllFiles(rootDir);
+    const currentManifest = await computeManifest(files);
+    const storedManifest = await loadStoredManifest();
+
+    if (!storedManifest) {
+        // First run: save and return no changes
+        await saveManifest(currentManifest);
+        return { changed: false, changedFiles: [], currentManifest };
+    }
+
+    const changedFiles = [];
+    const allKeys = new Set([...Object.keys(currentManifest), ...Object.keys(storedManifest)]);
+    for (const key of allKeys) {
+        const current = currentManifest[key];
+        const stored = storedManifest[key];
+        if (!current || !stored || current.hash !== stored.hash) {
+            changedFiles.push(key);
+        }
+    }
+
+    return {
+        changed: changedFiles.length > 0,
+        changedFiles,
+        currentManifest
     };
+}
 
-    files.forEach(f => {
-        if (f.startsWith('commands/')) categories.commands.push(f);
-        else if (['index.js', 'main.js', 'server.js', 'config.js', 'settings.js'].includes(f)) categories.core.push(f);
-        else if (f.startsWith('lib/')) categories.lib.push(f);
-        else categories.other.push(f);
+// ========== REMOTE CHECK (GITHUB) ==========
+async function getLatestCommit() {
+    const repoInfo = await axios.get(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`, {
+        headers: { 'User-Agent': 'MickeyBot' },
+        timeout: 5000
     });
-
-    return categories;
+    const defaultBranch = repoInfo.data.default_branch;
+    const commitRes = await axios.get(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${defaultBranch}`, {
+        headers: { 'User-Agent': 'MickeyBot' },
+        timeout: 5000
+    });
+    return { sha: commitRes.data.sha, branch: defaultBranch };
 }
 
-// Create detailed update info message
-function formatUpdateInfo(res) {
-    let message = '🔄 *UPDATE CHECK RESULT*\n\n';
-    
-    if (!res || res.mode === 'none') {
-        return '✅ *No updates available* — Your bot is up to date!';
+async function getStoredVersion() {
+    try {
+        const data = await fs.readFile(VERSION_FILE, 'utf8');
+        return JSON.parse(data).sha;
+    } catch {
+        return null;
     }
-
-    const updateType = res.mode === 'git' ? 'GIT' : 'ZIP';
-    message += `📦 *Update Type:* ${updateType}\n`;
-    message += `📅 *Time:* ${new Date().toLocaleString()}\n\n`;
-
-    if (res.mode === 'git') {
-        const allFiles = res.files ? res.files.split('\n').map(f => f.trim()).filter(Boolean) : [];
-        const total = allFiles.length;
-        const categories = categorizeChanges(allFiles);
-
-        if (res.available) {
-            message += `🟢 *STATUS:* UPDATE AVAILABLE\n\n`;
-            message += `📊 *Changes Summary:*\n`;
-            message += `  • Total files: ${total}\n`;
-            
-            if (categories.commands.length > 0) {
-                message += `  • Commands: ${categories.commands.length} ${categories.commands.length > 3 ? `(${categories.commands.slice(0, 2).join(', ')} +${categories.commands.length - 2})` : `(${categories.commands.join(', ')})`}\n`;
-            }
-            if (categories.core.length > 0) {
-                message += `  • Core files: ${categories.core.length} (${categories.core.join(', ')})\n`;
-            }
-            if (categories.lib.length > 0) {
-                message += `  • Libraries: ${categories.lib.length}\n`;
-            }
-            if (categories.other.length > 0) {
-                message += `  • Other: ${categories.other.length}\n`;
-            }
-            message += `\n💡 *Use .update to install now*`;
-            
-            return message;
-        } else {
-            return `✅ *No updates available* — All files are up to date`;
-        }
-    }
-
-    if (res.mode === 'zip') {
-        if (res.available) {
-            message += `🟢 *STATUS:* UPDATE AVAILABLE\n\n`;
-            const meta = res.remoteMeta;
-            message += `📁 *URL:* ${meta.url || 'Not available'}\n`;
-
-            if (res.changes) {
-                const { added = [], removed = [], modified = [] } = res.changes;
-                const all = [...added, ...removed, ...modified].map(f => f.trim()).filter(Boolean);
-                const total = all.length;
-                const categories = categorizeChanges(all);
-
-                message += `\n📊 *Changes Summary:*\n`;
-                message += `  • Total files: ${total}\n`;
-                message += `  • Added: ${added.length}\n`;
-                message += `  • Modified: ${modified.length}\n`;
-                message += `  • Removed: ${removed.length}\n`;
-
-                if (categories.commands.length > 0) {
-                    message += `  • Commands affected: ${categories.commands.length}\n`;
-                }
-                if (categories.core.length > 0) {
-                    message += `  • Core changes: ${categories.core.length}\n`;
-                }
-            }
-            message += `\n💡 *Use .update to install now*`;
-            return message;
-        } else {
-            return `✅ *No updates available* — Your bot is up to date`;
-        }
-    }
-
-    return message;
 }
 
+async function saveVersion(sha) {
+    await fs.mkdir(path.dirname(VERSION_FILE), { recursive: true });
+    await fs.writeFile(VERSION_FILE, JSON.stringify({ sha, updatedAt: new Date().toISOString() }, null, 2));
+}
+
+async function checkRemoteUpdates() {
+    try {
+        const { sha: latestSha, branch } = await getLatestCommit();
+        let currentSha = await getStoredVersion();
+        if (!currentSha) {
+            await saveVersion(latestSha);
+            return { available: false, latestSha, currentSha, branch };
+        }
+        const available = currentSha !== latestSha;
+        let changedFiles = [];
+        if (available) {
+            const compareRes = await axios.get(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/compare/${currentSha}...${latestSha}`, {
+                headers: { 'User-Agent': 'MickeyBot' },
+                timeout: 5000
+            });
+            changedFiles = compareRes.data.files.map(f => f.filename);
+        }
+        return { available, latestSha, currentSha, branch, changedFiles };
+    } catch (err) {
+        console.error('Remote check error:', err);
+        return { available: false, error: err.message };
+    }
+}
+
+// ========== FORMAT OUTPUT ==========
+function formatUpdateInfo(localResult, remoteResult) {
+    let output = '';
+
+    // Local changes
+    if (localResult.changed) {
+        output += `📁 *MABADILIKO YA NDANI (LOCAL)*\n`;
+        output += `Faili zilizobadilika: ${localResult.changedFiles.length}\n`;
+        const maxShow = 20;
+        const showFiles = localResult.changedFiles.slice(0, maxShow);
+        for (const file of showFiles) {
+            const relative = path.relative(path.join(__dirname, '..'), file);
+            output += `  • ${relative}\n`;
+        }
+        if (localResult.changedFiles.length > maxShow) {
+            output += `  ... na ${localResult.changedFiles.length - maxShow} zingine\n`;
+        }
+        output += `\n💡 *Suluhisho:* Tumia \`.checkupdates resetlocal\` baada ya kuhakiki.\n\n`;
+    } else {
+        output += `✅ *Hakuna mabadiliko ya ndani (local)*\n\n`;
+    }
+
+    // Remote updates
+    if (remoteResult.error) {
+        output += `❌ *Imeshindwa kuangalia GitHub:* ${remoteResult.error}\n\n`;
+    } else if (remoteResult.available) {
+        output += `🔄 *UPDATE INAPATIKANA KUTOKA GITHUB!*\n`;
+        output += `Toleo lako: \`${remoteResult.currentSha?.slice(0,7) || 'unknown'}\`\n`;
+        output += `Toleo jipya: \`${remoteResult.latestSha.slice(0,7)}\`\n`;
+        output += `Tawi: ${remoteResult.branch}\n`;
+        if (remoteResult.changedFiles && remoteResult.changedFiles.length) {
+            output += `\n📝 Faili zilizobadilika:\n`;
+            const maxShow = 20;
+            const showFiles = remoteResult.changedFiles.slice(0, maxShow);
+            for (const file of showFiles) {
+                output += `  • ${file}\n`;
+            }
+            if (remoteResult.changedFiles.length > maxShow) {
+                output += `  ... na ${remoteResult.changedFiles.length - maxShow} zingine\n`;
+            }
+        }
+        output += `\n💡 Baada ya kupakua, tumia \`.checkupdates resetlocal\`\n`;
+    } else {
+        output += `✅ *Bot iko updated (remote)!*\nToleo: \`${remoteResult.currentSha?.slice(0,7) || 'unknown'}\``;
+    }
+
+    return output;
+}
+
+// ========== MAIN COMMAND ==========
 async function checkUpdatesCommand(sock, chatId, message, args = []) {
     const senderId = message.key.participant || message.key.remoteJid;
     const isOwner = await isOwnerOrSudo(senderId, sock, chatId);
 
     if (!message.key.fromMe && !isOwner) {
-        await sock.sendMessage(chatId, { text: 'Only bot owner or sudo can use .checkupdates' }, { quoted: message });
+        await sock.sendMessage(chatId, { text: 'Owner pekee ndiye anaweza kutumia .checkupdates' }, { quoted: message });
         return;
     }
 
     const reminder = await loadReminder();
     const cmd = (args[0] || '').toLowerCase();
 
-    // Check for update reminders if auto-enabled
     if (cmd === 'auto') {
-        const enabled = reminder.autoReminder = !reminder.autoReminder;
+        reminder.autoReminder = !reminder.autoReminder;
         await saveReminder();
         await sock.sendMessage(chatId, {
-            text: `✅ Auto update reminders ${enabled ? 'ENABLED' : 'DISABLED'} — I will notify you every time an update is available`
+            text: `✅ Kumbusho la kiotomatiki ${reminder.autoReminder ? 'LIMEWASHWA' : 'IMEZIMWA'}`
         }, { quoted: message });
         return;
     }
 
-    // Show reminder status
     if (cmd === 'status') {
-        const status = reminder.autoReminder ? '✅ ENABLED' : '❌ DISABLED';
+        const status = reminder.autoReminder ? '✅ LIMEWASHWA' : '❌ IMEZIMWA';
         await sock.sendMessage(chatId, {
-            text: `📢 *Update Reminder Status:* ${status}\n\n💡 Use .checkupdates auto to toggle`
+            text: `📢 *Hali ya kumbusho:* ${status}\n\nTumia .checkupdates auto kugeuza.`
         }, { quoted: message });
+        return;
+    }
+
+    if (cmd === 'reset') {
+        try {
+            const { sha, branch } = await getLatestCommit();
+            await saveVersion(sha);
+            await sock.sendMessage(chatId, {
+                text: `✅ *Toleo limewekwa upya (remote)*\nToleo jipya: \`${sha.slice(0,7)}\` (tawi: ${branch})`
+            }, { quoted: message });
+        } catch (err) {
+            await sock.sendMessage(chatId, { text: `❌ Imeshindwa kuweka upya: ${err.message}` }, { quoted: message });
+        }
+        return;
+    }
+
+    if (cmd === 'resetlocal') {
+        try {
+            // Re-scan and save new manifest
+            const rootDir = path.join(__dirname, '..');
+            const files = await scanAllFiles(rootDir);
+            const manifest = await computeManifest(files);
+            await saveManifest(manifest);
+            await sock.sendMessage(chatId, {
+                text: `✅ *Hali ya ndani imewekwa upya* (manifest imeboreshwa)`
+            }, { quoted: message });
+        } catch (err) {
+            await sock.sendMessage(chatId, { text: `❌ Imeshindwa: ${err.message}` }, { quoted: message });
+        }
         return;
     }
 
     try {
-        const res = await updateCommand.checkUpdates();
-        const updateHash = res && res.files ? generateUpdateHash(res.files.split('\n'), res.mode) : null;
-        
-        // Format and send update info
-        const updateMsg = formatUpdateInfo(res);
+        // Run both checks in parallel
+        const [localResult, remoteResult] = await Promise.all([
+            checkLocalChanges(),
+            checkRemoteUpdates()
+        ]);
+
+        const updateMsg = formatUpdateInfo(localResult, remoteResult);
         await sock.sendMessage(chatId, { text: updateMsg }, { quoted: message });
 
-        // Auto-reminder logic
-        if (res && res.available) {
-            // Only remind if it's a new update (different hash)
-            if (updateHash !== reminder.updateHash) {
+        // Handle auto-reminder
+        if (remoteResult.available && reminder.autoReminder) {
+            const hash = remoteResult.latestSha.slice(0, 10);
+            if (hash !== reminder.updateHash) {
+                reminder.updateHash = hash;
                 reminder.updateFound = true;
-                reminder.updateHash = updateHash;
                 reminder.lastCheck = new Date().toISOString();
                 await saveReminder();
-
-                // Send quick reminder
-                if (reminder.autoReminder) {
-                    await sock.sendMessage(chatId, {
-                        text: `🔔 *QUICK REMINDER*\n\nA new update is available! Type .update to install it now.`
-                    });
-                }
+                await sock.sendMessage(chatId, {
+                    text: `🔔 *KUMBUKA:* Kuna update ya GitHub. Tumia .checkupdates reset baada ya kupakua.`
+                });
             }
-        } else {
+        } else if (!remoteResult.available && !remoteResult.error) {
             reminder.updateFound = false;
             reminder.updateHash = null;
             await saveReminder();
         }
-
     } catch (err) {
         console.error('CheckUpdates failed:', err);
         await sock.sendMessage(chatId, {
-            text: `❌ *Update Check Failed*\n\n${String(err.message || err).slice(0, 300)}`
+            text: `❌ *Imeshindwa kuangalia updates*\n\nHitilafu: ${err.message || err}`
         }, { quoted: message });
     }
 }
