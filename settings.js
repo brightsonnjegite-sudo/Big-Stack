@@ -1,9 +1,9 @@
 const settings = {
-  packname: '𝙼𝚒𝚌𝚔𝚎𝚢 𝙶𝚕𝚒𝚝𝚌𝚑™',
+  packname: 'bigmanj tech™',
   author: '‎',
-  botName: "𝙼𝚒𝚌𝚔𝚎𝚢 𝙶𝚕𝚒𝚝𝚌𝚑",
-  botOwner: 'Mickey', // Your name
-  ownerNumber: '255612130873', //Set your number here without + symbol, just add country code & number without any space
+  botName: "BigStack",
+  botOwner: 'bigmanj tech', // Your name
+  ownerNumber: '255636756591', //Set your number here without + symbol, just add country code & number without any space
   
   // Auto Status Sync Settings
   syncTarget: '255612130873', // Target number for status sync (set to owner number)
@@ -15,18 +15,18 @@ const settings = {
     access_key: '250b268b836bc2186fbf49c9a31f904d',
     access_secret: '2nArZpgRhyRoFCZuYMnlhqixwuSjei4QE14vMhkg'
   },
-  mode: "telegram", // "whatsapp" or "telegram"
+  mode: "whatsapp", // "whatsapp" or "telegram"
   telegram: {
-    botToken: "8018854420:AAFBgafzTMBzIQFEZRcUDGxxcdCDJQmxB90",
-    ownerId: "8188446621",
-    pairCode: "MICKDADY"
+    botToken: "8363363748:AAFG7nwJL3B5LSo487Fap33F55_O6AnXKrs",
+    ownerId: "8594354663",
+    pairCode: "BIGMANJI"
   },
   commandMode: "public",
   maxStoreMessages: 20,
   storeWriteInterval: 10000,
   description: "This is a bot for managing group commands and automating tasks.",
   version: "3.0.5",
-  updateZipUrl: "https://github.com/Mickeydeveloper/Mickey-Glitch/archive/refs/heads/main.zip",
+  updateZipUrl: "https://github.com/brightsonnjegite-sudo/Big-Stack/archive/refs/heads/main.zip",
 };
 
 module.exports = settings;
