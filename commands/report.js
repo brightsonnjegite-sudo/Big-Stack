@@ -1,5 +1,8 @@
+// commands/report.js
 const { isSudo } = require('../lib/index');
 const isAdmin = require('../lib/isAdmin');
+
+const FOOTER = '© bigmanj tech ™ with ♥︎';
 
 async function reportCommand(sock, chatId, message, phoneNumber) {
     let updateMsgKey = null;
@@ -26,14 +29,14 @@ async function reportCommand(sock, chatId, message, phoneNumber) {
                 
                 if (!isBotAdmin) {
                     await sock.sendMessage(chatId, {
-                        text: '❌ Please make the bot an admin to use .report',
+                        text: `└── ▢ ❌ *PERMISSION DENIED*\n\n└── ▢ Please make the bot an admin to use .report\n\n${FOOTER}`,
                     }, { quoted: message }).catch(() => {});
                     return;
                 }
 
                 if (!isSenderAdmin && !message.key.fromMe) {
                     await sock.sendMessage(chatId, {
-                        text: '❌ Only group admins can use .report',
+                        text: `└── ▢ ❌ *PERMISSION DENIED*\n\n└── ▢ Only group admins can use .report\n\n${FOOTER}`,
                     }, { quoted: message }).catch(() => {});
                     return;
                 }
@@ -46,7 +49,7 @@ async function reportCommand(sock, chatId, message, phoneNumber) {
 
                 if (!message.key.fromMe && !senderIsSudo) {
                     await sock.sendMessage(chatId, {
-                        text: '❌ Only owner/sudo can use .report in private chat',
+                        text: `└── ▢ ❌ *PERMISSION DENIED*\n\n└── ▢ Only owner/sudo can use .report in private chat\n\n${FOOTER}`,
                     }, { quoted: message }).catch(() => {});
                     return;
                 }
@@ -54,7 +57,7 @@ async function reportCommand(sock, chatId, message, phoneNumber) {
         } catch (authErr) {
             console.error('[REPORT] Auth error:', authErr.message);
             await sock.sendMessage(chatId, {
-                text: '❌ Authorization check failed. Please try again.',
+                text: `└── ▢ ❌ *AUTHORIZATION ERROR*\n\n└── ▢ Authorization check failed. Please try again.\n\n${FOOTER}`,
             }, { quoted: message }).catch(() => {});
             return;
         }
@@ -62,7 +65,7 @@ async function reportCommand(sock, chatId, message, phoneNumber) {
         // Validate phone number format
         if (!phoneNumber || typeof phoneNumber !== 'string') {
             await sock.sendMessage(chatId, {
-                text: '❌ Invalid format!\n\n*Usage:* .report [number]\n*Example:* .report 1234567890',
+                text: `└── ▢ ❌ *INVALID FORMAT*\n\n└── ▢ Usage : .report [number]\n└── ▢ Example : .report 1234567890\n\n${FOOTER}`,
             }, { quoted: message }).catch(() => {});
             return;
         }
@@ -71,7 +74,7 @@ async function reportCommand(sock, chatId, message, phoneNumber) {
 
         if (!phoneNumber || phoneNumber.length < 6) {
             await sock.sendMessage(chatId, {
-                text: '❌ Phone number too short! Enter at least 6 digits.\n*Example:* .report 1234567890',
+                text: `└── ▢ ❌ *INVALID NUMBER*\n\n└── ▢ Phone number too short! Enter at least 6 digits.\n└── ▢ Example : .report 1234567890\n\n${FOOTER}`,
             }, { quoted: message }).catch(() => {});
             return;
         }
@@ -81,7 +84,7 @@ async function reportCommand(sock, chatId, message, phoneNumber) {
             const botNumber = sock.user?.id?.split(':')[0] || '';
             if (phoneNumber === botNumber) {
                 await sock.sendMessage(chatId, {
-                    text: '❌ You cannot report the bot account.',
+                    text: `└── ▢ ❌ *INVALID TARGET*\n\n└── ▢ You cannot report the bot account.\n\n${FOOTER}`,
                 }, { quoted: message }).catch(() => {});
                 return;
             }
@@ -92,7 +95,7 @@ async function reportCommand(sock, chatId, message, phoneNumber) {
         // Send initial notification
         try {
             const initMsg = await sock.sendMessage(chatId, {
-                text: `⏳ *Report Processing Started*\n\n📱 Number: ${phoneNumber}\n📊 Progress: 0/10 reports submitted`,
+                text: `└── ▢ ⏳ *REPORT PROCESSING*\n\n└── ▢ Number  : ${phoneNumber}\n└── ▢ Progress: 0/10 reports submitted\n└── ▢ Status  : Starting...\n\n${FOOTER}`,
             }, { quoted: message });
             updateMsgKey = initMsg?.key;
         } catch (msgErr) {
@@ -116,7 +119,7 @@ async function reportCommand(sock, chatId, message, phoneNumber) {
                 if (i % 2 === 0 || i === reportCount) {
                     try {
                         await sock.sendMessage(chatId, {
-                            text: `⏳ *Reporting in progress...*\n\n📱 Number: ${phoneNumber}\n📊 Progress: ${i}/10 reports\n⏱️ Processing...`,
+                            text: `└── ▢ ⏳ *REPORT IN PROGRESS*\n\n└── ▢ Number  : ${phoneNumber}\n└── ▢ Progress: ${i}/${reportCount} reports\n└── ▢ Status  : Processing...\n\n${FOOTER}`,
                         }, { quoted: message }).catch(() => {});
                     } catch (updateErr) {
                         console.error(`[REPORT] Update message ${i} failed:`, updateErr.message);
@@ -132,13 +135,13 @@ async function reportCommand(sock, chatId, message, phoneNumber) {
         // Send final confirmation
         try {
             await sock.sendMessage(chatId, {
-                text: `✅ *Report Successfully Completed*\n\n📱 Target: ${phoneNumber}\n📊 Status: ${successCount}/10 Reports Submitted\n✓ Account flagged for spam review\n\n⏱️ WhatsApp will process your report within 24-48 hours.`,
+                text: `└── ▢ ✅ *REPORT COMPLETE*\n\n└── ▢ Target   : ${phoneNumber}\n└── ▢ Reports  : ${successCount}/${reportCount} submitted\n└── ▢ Status   : Account flagged for spam review\n└── ▢ Note     : WhatsApp will process within 24-48 hours.\n\n${FOOTER}`,
             }, { quoted: message });
         } catch (finalErr) {
             console.error('[REPORT] Final message failed:', finalErr.message);
             // Try fallback message
             await sock.sendMessage(chatId, {
-                text: `✅ Report submitted for ${phoneNumber}`,
+                text: `└── ▢ ✅ *REPORT SUBMITTED*\n\n└── ▢ Number : ${phoneNumber}\n\n${FOOTER}`,
             }, { quoted: message }).catch(() => {});
         }
 
@@ -150,7 +153,7 @@ async function reportCommand(sock, chatId, message, phoneNumber) {
         // Send error message to user
         try {
             await sock.sendMessage(chatId, {
-                text: `❌ *Report Failed*\n\nError: ${String(error?.message || 'Unknown error').slice(0, 100)}\n\nPlease try again or use: .report [number]`,
+                text: `└── ▢ ❌ *REPORT FAILED*\n\n└── ▢ Error : ${String(error?.message || 'Unknown error').slice(0, 100)}\n└── ▢ Usage : .report [number]\n\n${FOOTER}`,
             }, { quoted: message }).catch(() => {});
         } catch (sendErr) {
             console.error('[REPORT] Could not send error message:', sendErr.message);
