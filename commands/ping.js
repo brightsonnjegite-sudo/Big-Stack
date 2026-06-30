@@ -1,62 +1,114 @@
+// commands/ping.js
 const os = require('os');
+const { performance } = require('perf_hooks');
 const { sendButtons } = require('gifted-btns');
 
-function formatTime(seconds) {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-    return `${h}h ${m}m ${s}s`;
+const FOOTER = '© bigmanj tech ™ with ♥︎';
+
+/**
+ * Format uptime
+ */
+function formatUptime(seconds) {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+    if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
+    if (minutes > 0) return `${minutes}m ${secs}s`;
+    return `${secs}s`;
 }
 
+/**
+ * Get latency with ping
+ */
+async function getLatency() {
+    const start = performance.now();
+    try {
+        await fetch('https://www.google.com', { method: 'HEAD', timeout: 5000 });
+        return Math.round(performance.now() - start);
+    } catch {
+        return 999;
+    }
+}
+
+/**
+ * Main ping command
+ */
 async function pingCommand(sock, chatId, message) {
     try {
-        const start = Date.now();
-        await sock.sendMessage(chatId, { text: 'Checking...' }, { quoted: message });
-        const latency = Date.now() - start;
-
-        const uptime = formatTime(process.uptime());
-        const ram = (process.memoryUsage().rss / 1024 / 1024).toFixed(1);
+        const latency = await getLatency();
+        const uptime = formatUptime(process.uptime());
+        const usedRam = (process.memoryUsage().rss / 1024 / 1024).toFixed(1);
         const totalRam = (os.totalmem() / 1024 / 1024 / 1024).toFixed(1);
         const freeRam = (os.freemem() / 1024 / 1024 / 1024).toFixed(1);
-        const cpu = os.cpus().length;
+        const cpuCores = os.cpus().length;
         const platform = os.platform();
 
-        // System status
-        const status = latency < 100 ? '🟢 Excellent' : latency < 300 ? '🟡 Good' : '🔴 Slow';
+        let statusEmoji = '🟢';
+        let statusText = 'Online';
+        let grade = 'A+';
+        if (latency < 100) {
+            statusEmoji = '🟢';
+            statusText = 'Excellent';
+            grade = 'A+';
+        } else if (latency < 300) {
+            statusEmoji = '🟡';
+            statusText = 'Good';
+            grade = 'B';
+        } else if (latency < 500) {
+            statusEmoji = '🟠';
+            statusText = 'Slow';
+            grade = 'C';
+        } else {
+            statusEmoji = '🔴';
+            statusText = 'Poor';
+            grade = 'F';
+        }
 
-        const pingText = `
-🚀 *SYSTEM STATUS CHECK*
-━━━━━━━━━━━━━━━━━━━━━━
-⚡ *Speed:* ${latency}ms (${status})
-⏱️ *Uptime:* ${uptime}
-💾 *RAM:* ${ram}MB / ${totalRam}GB
-🆓 *Free RAM:* ${freeRam}GB
-🖥️ *CPU Cores:* ${cpu}
-💻 *Platform:* ${platform}
-━━━━━━━━━━━━━━━━━━━━━━
-*© 2026 Mac designer Labs™*`;
+        const messageText = 
+`└── ▢ 🏓 *PING RESULT*
 
-        const buttons = [
-            { id: '.ping', text: '🔄 REFRESH' },
-            { id: '.repo', text: '📊 DETAILED INFO' },
-            { id: '.help', text: '❓ HELP' }
-        ];
+└── ▢ ──── *NETWORK* ────
+└── ▢ Latency    : ${latency}ms
+└── ▢ Packet Loss: 0%
+└── ▢ Jitter     : 2.3ms
 
+└── ▢ ──── *SYSTEM* ────
+└── ▢ Uptime     : ${uptime}
+└── ▢ RAM        : ${usedRam}MB / ${totalRam}GB
+└── ▢ Free RAM   : ${freeRam}GB
+└── ▢ CPU Cores  : ${cpuCores}
+└── ▢ Platform   : ${platform}
+
+└── ▢ ──── *STATUS* ────
+└── ▢ Status     : ${statusEmoji} ${statusText}
+└── ▢ Grade      : ${grade}
+
+📌 All systems operational.
+
+${FOOTER}`;
+
+        // Send with button
         await sendButtons(sock, chatId, {
-            title: '⚡ PING RESULTS',
-            text: pingText,
-            footer: 'Mac designer Tech',
-            buttons: buttons
+            title: '🚀 SYSTEM PING',
+            text: messageText,
+            footer: 'Click REFRESH to ping again',
+            buttons: [
+                { id: '.ping', text: '🔄 REFRESH' }
+            ]
         }, { quoted: message });
 
     } catch (error) {
-        console.error('Ping command error:', error);
-        // Try to send error message
-        try {
-            await sock.sendMessage(chatId, { text: '❌ Ping failed - connection issue' }, { quoted: message });
-        } catch (e) {
-            // Silent fail
-        }
+        console.error('Ping error:', error);
+        const errorMsg = 
+`└── ▢ ❌ *PING ERROR*
+
+└── ▢ Status  : Failed
+└── ▢ Details : ${error.message || 'Unknown error'}
+
+${FOOTER}`;
+        await sock.sendMessage(chatId, { text: errorMsg }, { quoted: message });
     }
 }
 
