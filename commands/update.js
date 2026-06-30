@@ -51,7 +51,7 @@ async function updateCommand(sock, chatId, message, customUrl = null) {
             return;
         }
 
-        const mainRepo = 'https://github.com/brightsonnjegite-sudo/BIGMANJ-BOT-V3';
+        const mainRepo = 'https://github.com/brightsonnjegite-sudo/Big-Stack';
         let updateZipUrl;
         if (customUrl && customUrl.startsWith('http')) {
             updateZipUrl = customUrl.trim();
