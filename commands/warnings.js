@@ -1,5 +1,8 @@
+// commands/warnings.js
 const fs = require('fs');
 const path = require('path');
+
+const FOOTER = '© bigmanj tech ™ with ♥︎';
 
 const warningsFilePath = path.join(__dirname, '../data/warnings.json');
 
@@ -12,17 +15,42 @@ function loadWarnings() {
 }
 
 async function warningsCommand(sock, chatId, mentionedJidList) {
-    const warnings = loadWarnings();
+    try {
+        const warnings = loadWarnings();
 
-    if (mentionedJidList.length === 0) {
-        await sock.sendMessage(chatId, { text: 'Please mention a user to check warnings.' });
-        return;
+        if (!mentionedJidList || mentionedJidList.length === 0) {
+            await sock.sendMessage(chatId, { 
+                text: `└── ▢ ❌ *ERROR*\n\n└── ▢ Please mention a user to check warnings.\n\n${FOOTER}` 
+            });
+            return;
+        }
+
+        const userToCheck = mentionedJidList[0];
+        const userNum = userToCheck.split('@')[0];
+        const warningCount = warnings[userToCheck] || 0;
+
+        const msg = 
+`└── ▢ ⚠️ *WARNINGS CHECK*
+
+└── ▢ ──── *RESULT* ────
+└── ▢ User    : @${userNum}
+└── ▢ Warnings: ${warningCount}
+
+📌 ${warningCount === 0 ? 'User has no warnings.' : `User has ${warningCount} warning(s).`}
+
+${FOOTER}`;
+
+        await sock.sendMessage(chatId, { 
+            text: msg,
+            mentions: [userToCheck] 
+        });
+
+    } catch (error) {
+        console.error('Error in warnings command:', error);
+        await sock.sendMessage(chatId, { 
+            text: `└── ▢ ❌ *ERROR*\n\n└── ▢ Failed to retrieve warnings.\n\n${FOOTER}` 
+        });
     }
-
-    const userToCheck = mentionedJidList[0];
-    const warningCount = warnings[userToCheck] || 0;
-
-    await sock.sendMessage(chatId, { text: `User has ${warningCount} warning(s).` });
 }
 
 module.exports = warningsCommand;
