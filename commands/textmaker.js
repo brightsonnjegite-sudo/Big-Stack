@@ -8,7 +8,7 @@ const messageTemplates = {
     }),
     success: (text, imageUrl) => ({
         image: { url: imageUrl },
-        caption: "𝙼𝚒𝚌𝚔𝚎𝚢 𝙶𝚕𝚒𝚝𝚌𝚑™"
+        caption: "bigmanj tech™"
     })
 };
 
