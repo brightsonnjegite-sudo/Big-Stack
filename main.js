@@ -156,7 +156,15 @@ const repoCommand = require('./commands/repo');
 const statsCommand = require('./commands/stats');
 const stickerAltCommand = require('./commands/sticker-alt');
 
-
+// ========== MINI-MENU IMPORTS ==========
+const menuGeneral = require('./commands/menu-general');
+const menuGroup = require('./commands/menu-group');
+const menuModeration = require('./commands/menu-moderation');
+const menuMedia = require('./commands/menu-media');
+const menuAI = require('./commands/menu-ai');
+const menuOwner = require('./commands/menu-owner');
+const menuOther = require('./commands/menu-other');
+const menuAll = require('./commands/menu-all');
 
 // Global settings
 global.packname = settings.packname;
@@ -1253,6 +1261,39 @@ async function handleMessages(sock, messageUpdate, printLog) {
                 break;
             case userMessage.startsWith('.stickeralt'):
                 await stickerAltCommand(sock, chatId, message);
+                break;
+            // ========== MINI-MENU CASES ==========
+            case userMessage === '.menu-general':
+                await menuGeneral(sock, chatId, message);
+                commandExecuted = true;
+                break;
+            case userMessage === '.menu-group':
+                await menuGroup(sock, chatId, message);
+                commandExecuted = true;
+                break;
+            case userMessage === '.menu-moderation' || userMessage === '.menu-security':
+                await menuModeration(sock, chatId, message);
+                commandExecuted = true;
+                break;
+            case userMessage === '.menu-media' || userMessage === '.menu-download':
+                await menuMedia(sock, chatId, message);
+                commandExecuted = true;
+                break;
+            case userMessage === '.menu-ai':
+                await menuAI(sock, chatId, message);
+                commandExecuted = true;
+                break;
+            case userMessage === '.menu-owner':
+                await menuOwner(sock, chatId, message);
+                commandExecuted = true;
+                break;
+            case userMessage === '.menu-other':
+                await menuOther(sock, chatId, message);
+                commandExecuted = true;
+                break;
+            case userMessage === '.menu-all' || userMessage === '.all':
+                await menuAll(sock, chatId, message);
+                commandExecuted = true;
                 break;
             // .removebg command removed
             // .remini command removed
