@@ -68,13 +68,13 @@ ${FOOTER}`;
 
     if (sub === 'status') {
         const statusMsg = 
-`└── ▢ 📊 *ANTICALL STATUS*
+`└ ▢ 📊 *ANTICALL STATUS*
 
-└── ▢ ──── *CONFIGURATION* ────
-└── ▢ Status   : ${state.enabled ? '🟢 ENABLED' : '🔴 DISABLED'}
-└── ▢ Calls    : ${state.enabled ? '🚫 BLOCKED' : '✅ ALLOWED'}
-└── ▢ Messages : ✅ ALLOWED
-└── ▢ Auto-ban : After 3 calls
+└ ▢  ─*CONFIGURATION* ─
+└ ▢ Status   : ${state.enabled ? '🟢 ENABLED' : '🔴 DISABLED'}
+└ ▢ Calls    : ${state.enabled ? '🚫 BLOCKED' : '✅ ALLOWED'}
+└ ▢ Messages : ✅ ALLOWED
+└ ▢ Auto-ban : After 3 calls
 
 ${FOOTER}`;
         await sock.sendMessage(chatId, { text: statusMsg }, { quoted: message });
@@ -84,9 +84,9 @@ ${FOOTER}`;
     const enable = sub === 'on';
     if (enable === state.enabled) {
         const alreadyMsg = 
-`└── ▢ ℹ️ *ALREADY ${enable ? 'ENABLED' : 'DISABLED'}*
+`└ ▢ ℹ️ *ALREADY ${enable ? 'ENABLED' : 'DISABLED'}*
 
-└── ▢ Anticall is already *${enable ? 'ENABLED' : 'DISABLED'}*.
+└ ▢ Anticall is already *${enable ? 'ENABLED' : 'DISABLED'}*.
 
 ${FOOTER}`;
         await sock.sendMessage(chatId, { text: alreadyMsg }, { quoted: message });
@@ -97,23 +97,23 @@ ${FOOTER}`;
     writeState(state);
 
     const responseText = enable
-        ? `└─ ▢ 🔒 *ANTICALL ACTIVATED*
+        ? `└ ▢ 🔒 *ANTICALL ACTIVATED*
 
-└─ ▢ ─ *STATUS* ─
-└─ ▢ Status   : 🟢 ON
-└─ ▢ Calls    : 🔒 BLOCKED
-└─ ▢ Messages : ✅ ALLOWED
+└ ▢ ─ *STATUS* ─
+└ ▢ Status   : 🟢 ON
+└ ▢ Calls    : 🔒 BLOCKED
+└ ▢ Messages : ✅ ALLOWED
 
 📌 All incoming calls are now automatically blocked.
 📝 Send a message instead.
 
 ${FOOTER}`
-        : `└─ ▢ 🔓 *ANTICALL DEACTIVATED*
+        : `└ ▢ 🔓 *ANTICALL DEACTIVATED*
 
-└─ ▢ ─ *STATUS* ─
-└─ ▢ Status   : 🔴 OFF
-└─ ▢ Calls    : ✅ ALLOWED
-└─ ▢ Messages : ✅ ALLOWED
+└ ▢ ─ *STATUS* ─ 
+└ ▢ Status   : 🔴 OFF
+└ ▢ Calls    : ✅ ALLOWED
+└ ▢ Messages : ✅ ALLOWED
 
 📌 Calls are now allowed.
 ⚠️ Bot may still log call attempts.
@@ -127,11 +127,11 @@ async function sendCallPolicyMessage(sock, toJid, callerNumber, callCount) {
     let policyMsg;
     if (callCount === 1) {
         policyMsg = 
-`└─ ▢ 📞 *VOICE CALL POLICY*
+`└ ▢ 📞 *VOICE CALL POLICY*
 
-└─ ▢ ─ *NOTICE* ─
-└─ ▢ We don't accept calls 📞.
-└─ ▢ Please send a text message.
+└ ▢ ─ *NOTICE* ─
+└ ▢ We don't accept calls 📞.
+└ ▢ Please send a text message.
 
 📌 Quick replies for messages.
 📌 Calls are automatically ignored.
@@ -141,11 +141,11 @@ async function sendCallPolicyMessage(sock, toJid, callerNumber, callCount) {
 ${FOOTER}`;
     } else if (callCount === 2) {
         policyMsg = 
-`└── ▢ ⚠️ *WARNING*
+`└ ▢ ⚠️ *WARNING*
 
-└─ ▢ ─ *FINAL WARNING* ─
-└─ ▢ You have called ${callCount} time(s).
-└─ ▢ One more call and you will be *PERMANENTLY BLOCKED*.
+└ ▢ ─ *FINAL WARNING* ─
+└ ▢ You have called ${callCount} time(s).
+└ ▢ One more call and you will be *PERMANENTLY BLOCKED*.
 
 📌 Please refrain from calling.
 
@@ -154,9 +154,9 @@ ${FOOTER}`;
         policyMsg = 
 `└ ▢ 🚫 *YOU HAVE BEEN BLOCKED*
 
-└─ ▢ ──── *ACTION TAKEN* ────
-└─ ▢ Reason   : 3 unanswered calls
-└─ ▢ Status   : ❌ Permanently blocked
+└ ▢ ─ *ACTION TAKEN* ─
+└ ▢ Reason   : 3 unanswered calls
+└ ▢ Status   : ❌ Permanently blocked
 
 📌 You can no longer interact with this bot.
 
