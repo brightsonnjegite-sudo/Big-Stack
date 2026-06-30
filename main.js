@@ -140,7 +140,8 @@ const sudoCommand = require('./commands/sudo');
 
 const stickercropCommand = require('./commands/stickercrop');
 const mickeyCommand = require('./commands/Mickey');
-const updateCommand = require('./commands/update');
+// ✅ FIXED: Destructure updateCommand from the exported object
+const { updateCommand } = require('./commands/update');
 const checkUpdatesCommand = require('./commands/checkupdates');
 const { igsCommand } = require('./commands/igs');
 const { anticallCommand, readState: readAnticallState } = require('./commands/anticall');
