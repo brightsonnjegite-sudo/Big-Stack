@@ -8,32 +8,18 @@ const FOOTER = '© bigmanj tech ™ with ♥︎';
 
 async function toimgCommand(sock, chatId, message) {
     try {
-        // 1. Check if user replied to a sticker
         const quotedMessage = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
         const stickerMessage = quotedMessage?.stickerMessage || message.message?.stickerMessage;
 
         if (!stickerMessage) {
-            const errorMsg = 
-`└── ▢ ❌ *ERROR*
-
-└── ▢ Please reply to a sticker with .toimg
-
-${FOOTER}`;
+            const errorMsg = `└── ▢ ❌ *ERROR*\n\n└── ▢ Please reply to a sticker with .toimg\n\n${FOOTER}`;
             await sock.sendMessage(chatId, { text: errorMsg }, { quoted: message });
             return;
         }
 
-        // 2. Send "processing" message
-        const processingMsg = 
-`└─ ▢ ⏳ *PROCESSING*
-
-└─ ▢ Converting sticker to image...
-└─ ▢ Please wait.
-
-${FOOTER}`;
+        const processingMsg = `└── ▢ ⏳ *PROCESSING*\n\n└── ▢ Converting sticker to image...\n└── ▢ Please wait.\n\n${FOOTER}`;
         await sock.sendMessage(chatId, { text: processingMsg }, { quoted: message });
 
-        // 3. Download the sticker
         const stream = await downloadContentFromMessage(stickerMessage, 'sticker');
         let buffer = Buffer.from([]);
         for await (const chunk of stream) {
@@ -44,36 +30,19 @@ ${FOOTER}`;
             throw new Error('Empty sticker data');
         }
 
-        // 4. Convert using sharp (webp → png)
         let outputBuffer;
         try {
-            outputBuffer = await sharp(buffer)
-                .png()
-                .toBuffer();
+            outputBuffer = await sharp(buffer).png().toBuffer();
         } catch (sharpErr) {
-            // If sharp fails, try to handle as animated webp by extracting first frame
             console.error('Sharp conversion error, trying fallback...', sharpErr.message);
-            // Attempt to convert using sharp with first frame
             try {
-                outputBuffer = await sharp(buffer, { pages: -1 })
-                    .png()
-                    .toBuffer();
+                outputBuffer = await sharp(buffer, { pages: -1 }).png().toBuffer();
             } catch (fallbackErr) {
                 throw new Error('Failed to convert sticker. It might be corrupted.');
             }
         }
 
-        // 5. Send the converted image
-        const successMsg = 
-`└─ ▢ ✅ *CONVERSION SUCCESSFUL*
-
-└─ ▢ ──── *INFO* ────
-└─ ▢ Type  : Sticker → Image
-└─ ▢ Format: PNG
-
-📌 Your sticker has been converted to image.
-
-${FOOTER}`;
+        const successMsg = `└── ▢ ✅ *CONVERSION SUCCESSFUL*\n\n└── ▢ ──── *INFO* ────\n└── ▢ Type  : Sticker → Image\n└── ▢ Format: PNG\n\n📌 Your sticker has been converted to image.\n\n${FOOTER}`;
 
         await sock.sendMessage(chatId, {
             image: outputBuffer,
@@ -82,14 +51,7 @@ ${FOOTER}`;
 
     } catch (error) {
         console.error('Toimg error:', error);
-        const errorMsg = 
-`└── ▢ ❌ *ERROR*
-
-└── ▢ ${error.message || 'Failed to convert sticker.'}
-
-📌 Make sure the sticker is valid.
-
-${FOOTER}`;
+        const errorMsg = `└── ▢ ❌ *ERROR*\n\n└── ▢ ${error.message || 'Failed to convert sticker.'}\n\n📌 Make sure the sticker is valid.\n\n${FOOTER}`;
         await sock.sendMessage(chatId, { text: errorMsg }, { quoted: message });
     }
 }
