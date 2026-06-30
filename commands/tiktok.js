@@ -1,5 +1,8 @@
+// commands/tiktok.js
 const axios = require('axios');
 const { getBuffer } = require('../lib/myfunc');
+
+const FOOTER = '© bigmanj tech ™ with ♥︎';
 
 const AXIOS_DEFAULTS = {
     timeout: 60000,
@@ -24,19 +27,15 @@ async function tryRequest(getter, attempts = 3) {
 
 // Function ya kupata data kutoka kwenye API mpya
 async function getTiktokDownload(url) {
-    // API URL mpya uliyotoa
     const apiUrl = `https://api-aswin-sparky.koyeb.app/api/downloader/tiktok?url=${encodeURIComponent(url)}`;
     
     const res = await tryRequest(() => axios.get(apiUrl, AXIOS_DEFAULTS));
     
-    // Kukagua kama data imerudi (muundo: res.data.status na res.data.data)
     if (!res || !res.data || !res.data.status || !res.data.data) {
         throw new Error('No response from TikTok API');
     }
 
     const d = res.data.data;
-
-    // Video URL ipo kwenye d.video kulingana na JSON yako
     const videoUrl = d.video;
     if (!videoUrl) throw new Error('Could not find video URL in API response');
 
@@ -54,33 +53,85 @@ async function tiktokCommand(sock, chatId, message) {
         const url = text.split(' ').slice(1).join(' ').trim();
 
         if (!url || !url.includes('tiktok.com')) {
-            return await sock.sendMessage(chatId, { 
-                text: '❌ Weka link ya TikTok. Mfano: .tiktok https://www.tiktok.com/@user/video/123' 
-            }, { quoted: message });
+            const usageMsg = 
+`└── ▢ 🎵 *TIKTOK DOWNLOADER*
+
+└── ▢ ──── *USAGE* ────
+└── ▢ .tiktok <url>
+
+└── ▢ ──── *EXAMPLE* ────
+└── ▢ .tiktok https://www.tiktok.com/@user/video/123
+
+${FOOTER}`;
+            return await sock.sendMessage(chatId, { text: usageMsg }, { quoted: message });
         }
 
         await sock.sendMessage(chatId, { react: { text: '🔎', key: message.key } });
+
+        // ─── SEND PROCESSING MESSAGE ───
+        const processingMsg = 
+`└── ▢ 🎵 *TIKTOK DOWNLOADER*
+
+└── ▢ Status  : ⏳ Processing...
+└── ▢ URL     : ${url.substring(0, 40)}...
+└── ▢ Source  : API (Aswin Sparky)
+
+📌 Please wait, downloading video...
+
+${FOOTER}`;
+        await sock.sendMessage(chatId, { text: processingMsg }, { quoted: message });
 
         let tikData;
         try {
             tikData = await getTiktokDownload(url);
         } catch (err) {
             console.error("API Error:", err.message);
-            return await sock.sendMessage(chatId, { text: '❌ API imeshindwa (Error). Jaribu tena baadaye.' }, { quoted: message });
+            const errorMsg = 
+`└── ▢ ❌ *DOWNLOAD FAILED*
+
+└── ▢ Status  : ❌ Error
+└── ▢ Details : ${err.message || 'API request failed'}
+
+📌 Please try again later.
+
+${FOOTER}`;
+            return await sock.sendMessage(chatId, { text: errorMsg }, { quoted: message });
         }
 
         await sock.sendMessage(chatId, { react: { text: '📥', key: message.key } });
 
-        // Kutuma video kwenda WhatsApp
+        // ─── BUILD SUCCESS CAPTION ───
+        const caption = 
+`└── ▢ 🎵 *TIKTOK DOWNLOADER*
+
+└── ▢ ──── *VIDEO INFO* ────
+└── ▢ 👤 Author  : ${tikData.nickname || 'N/A'}
+└── ▢ 📝 Title   : ${tikData.title || 'No Title'}
+└── ▢ 📅 Status  : ✅ Downloaded
+└── ▢ 🔗 Source  : ${url.substring(0, 30)}...
+
+📌 Video attached below.
+
+${FOOTER}`;
+
+        // ─── SEND VIDEO ───
         try {
             await sock.sendMessage(chatId, {
                 video: { url: tikData.url },
                 mimetype: 'video/mp4',
-                caption: `✅ *TikTok Downloader*\n\n👤 *Author:* ${tikData.nickname || 'N/A'}\n📝 *Title:* ${tikData.title || 'No Title'}\n🔗 *Source:* ${url}`
+                caption: caption
             }, { quoted: message });
         } catch (err) {
             console.error("Send Error:", err.message);
-            await sock.sendMessage(chatId, { text: '🚨 *Hitilafu ya kutuma!* Video inaweza kuwa kubwa sana au link imekufa.' });
+            const errorMsg = 
+`└── ▢ ❌ *SEND FAILED*
+
+└── ▢ Video may be too large or the link has expired.
+
+📌 Try using a different link.
+
+${FOOTER}`;
+            await sock.sendMessage(chatId, { text: errorMsg });
             return;
         }
 
@@ -88,7 +139,15 @@ async function tiktokCommand(sock, chatId, message) {
 
     } catch (err) {
         console.error("TIKTOK CMD ERROR:", err.message);
-        await sock.sendMessage(chatId, { text: '🚨 *Hitilafu!* Jaribu tena baadae.' });
+        const errorMsg = 
+`└── ▢ ❌ *ERROR*
+
+└── ▢ Details : ${err.message || 'Unknown error'}
+
+📌 Please try again later.
+
+${FOOTER}`;
+        await sock.sendMessage(chatId, { text: errorMsg });
     }
 }
 
