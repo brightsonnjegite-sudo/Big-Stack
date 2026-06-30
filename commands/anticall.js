@@ -1,6 +1,8 @@
+// commands/anticall.js
 const fs = require('fs');
 const path = require('path');
 
+const FOOTER = '© bigmanj tech ™ with ♥︎';
 const ANTICALL_PATH = path.join(process.cwd(), 'data', 'anticall.json');
 
 function readState() {
@@ -38,7 +40,7 @@ const ALLOWED_NUMBERS = [
 ];
 
 function normalizeNumber(num) {
-    return num.replace(/\s/g, ''); // remove spaces
+    return num.replace(/\s/g, '');
 }
 
 function isAllowedNumber(number) {
@@ -51,41 +53,72 @@ async function anticallCommand(sock, chatId, message, args) {
     const sub = (args || '').trim().toLowerCase();
 
     if (!sub || (sub !== 'on' && sub !== 'off' && sub !== 'status')) {
-        await sock.sendMessage(chatId, {
-            text: `*ANTICALL*\n\n.anticall on  - Enable auto-block on incoming calls\n.anticall off - Disable anticall\n.anticall status - Show current status`
-        }, { quoted: message });
+        const helpMsg = 
+`└── ▢ 📞 *ANTICALL COMMAND*
+
+└──▢ ─ *USAGE* ─
+└─ ▢ .anticall on     - Enable auto-block on incoming calls
+└─ ▢ .anticall off    - Disable anticall
+└─ ▢ .anticall status - Show current status
+
+${FOOTER}`;
+        await sock.sendMessage(chatId, { text: helpMsg }, { quoted: message });
         return;
     }
 
     if (sub === 'status') {
-        const statusText = 
-`*[ ANTICALL STATUS ]*
+        const statusMsg = 
+`└── ▢ 📊 *ANTICALL STATUS*
 
-*🤖 BigStack* 
-*by ~© bigmanj tech ™~* 
-Calls: ${state.enabled ? 'BLOCKED ✅' : 'ALLOWED ❌'}
-Messages: ALLOWED ✅
-Auto‑ban after 3 calls: YES
+└── ▢ ──── *CONFIGURATION* ────
+└── ▢ Status   : ${state.enabled ? '🟢 ENABLED' : '🔴 DISABLED'}
+└── ▢ Calls    : ${state.enabled ? '🚫 BLOCKED' : '✅ ALLOWED'}
+└── ▢ Messages : ✅ ALLOWED
+└── ▢ Auto-ban : After 3 calls
 
-© bigmanj tech ™ with ♥︎`;
-        await sock.sendMessage(chatId, { text: statusText }, { quoted: message });
+${FOOTER}`;
+        await sock.sendMessage(chatId, { text: statusMsg }, { quoted: message });
         return;
     }
 
     const enable = sub === 'on';
     if (enable === state.enabled) {
-        await sock.sendMessage(chatId, {
-            text: `Anticall is already *${enable ? 'ENABLED' : 'DISABLED'}*.`
-        }, { quoted: message });
+        const alreadyMsg = 
+`└── ▢ ℹ️ *ALREADY ${enable ? 'ENABLED' : 'DISABLED'}*
+
+└── ▢ Anticall is already *${enable ? 'ENABLED' : 'DISABLED'}*.
+
+${FOOTER}`;
+        await sock.sendMessage(chatId, { text: alreadyMsg }, { quoted: message });
         return;
     }
 
     state.enabled = enable;
     writeState(state);
 
-    const responseText = enable 
-        ? `*⚙️– ANTICALL ACTIVATED*\n*BIGMANJ BOT V3*\n*by ~© bigmanj tech ™~*\n\n🔒 All incoming calls are now BLOCKED\n📝 Send a message instead\n\n✅ Status: ON\n\nStay safe from spam calls.\n\n━━━━━━━━━━━━━━━━\n© bigmanj tech ™ with ♥︎`
-        : `*⚙️– ANTICALL DEACTIVATED*\n*BIGMANJ BOT V3*\n*by ~© bigmanj tech ™~*\n\n🔓 Calls are now ALLOWED\n📞 You may receive voice calls\n\n⚠️ Note: Bot may still log call attempts\n\n━━━━━━━━━━━━━━━━\n© bigmanj tech ™ with ♥︎`;
+    const responseText = enable
+        ? `└─ ▢ 🔒 *ANTICALL ACTIVATED*
+
+└─ ▢ ─ *STATUS* ─
+└─ ▢ Status   : 🟢 ON
+└─ ▢ Calls    : 🔒 BLOCKED
+└─ ▢ Messages : ✅ ALLOWED
+
+📌 All incoming calls are now automatically blocked.
+📝 Send a message instead.
+
+${FOOTER}`
+        : `└─ ▢ 🔓 *ANTICALL DEACTIVATED*
+
+└─ ▢ ─ *STATUS* ─
+└─ ▢ Status   : 🔴 OFF
+└─ ▢ Calls    : ✅ ALLOWED
+└─ ▢ Messages : ✅ ALLOWED
+
+📌 Calls are now allowed.
+⚠️ Bot may still log call attempts.
+
+${FOOTER}`;
 
     await sock.sendMessage(chatId, { text: responseText }, { quoted: message });
 }
@@ -94,36 +127,40 @@ async function sendCallPolicyMessage(sock, toJid, callerNumber, callCount) {
     let policyMsg;
     if (callCount === 1) {
         policyMsg = 
-`*🤖 BigStack* 
-by *~© bigmanj tech ™~*
+`└─ ▢ 📞 *VOICE CALL POLICY*
 
-*– Voice Call Policy*
+└─ ▢ ─ *NOTICE* ─
+└─ ▢ We don't accept calls 📞.
+└─ ▢ Please send a text message.
 
-*We don't accept calls 📞. Please text us.*
-*✅ Quick replies for messages*
-*❌ Calls are automatically ignored*
+📌 Quick replies for messages.
+📌 Calls are automatically ignored.
 
-*Thank you for understanding*
+📌 *Note:* If you call 3 times, you will be blocked.
 
-*If repeated three times @${callerNumber} blocked*
-
-© bigmanj tech ™ with ♥︎`;
+${FOOTER}`;
     } else if (callCount === 2) {
         policyMsg = 
-`⚠️ *WARNING* ⚠️
+`└── ▢ ⚠️ *WARNING*
 
-You have called ${callCount} time(s).
-One more call and you will be *PERMANENTLY BLOCKED*.
+└─ ▢ ─ *FINAL WARNING* ─
+└─ ▢ You have called ${callCount} time(s).
+└─ ▢ One more call and you will be *PERMANENTLY BLOCKED*.
 
-© bigmanj tech ™ with ♥︎`;
+📌 Please refrain from calling.
+
+${FOOTER}`;
     } else {
         policyMsg = 
-`🚫 *YOU HAVE BEEN BLOCKED* 🚫
+`└ ▢ 🚫 *YOU HAVE BEEN BLOCKED*
 
-You ignored the policy and called 3 times.
-Bot has now blocked you permanently.
+└─ ▢ ──── *ACTION TAKEN* ────
+└─ ▢ Reason   : 3 unanswered calls
+└─ ▢ Status   : ❌ Permanently blocked
 
-© bigmanj tech ™ with ♥︎`;
+📌 You can no longer interact with this bot.
+
+${FOOTER}`;
     }
     await sock.sendMessage(toJid, { text: policyMsg });
 }
