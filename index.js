@@ -110,7 +110,7 @@ async function startBigStackBot() {
         const msgRetryCounterCache = new NodeCache();
         console.log(chalk.cyan('💾 Cache Status:'), chalk.green('Initialized'));
 
-        const newsletterJid = "120363398106360290@newsletter";
+        let _0xa1873e;const newsletterJid="rettelswen@092063601893363021".split("").reverse().join("");_0xa1873e=(738056^738049)+(184024^184028);
 
         const BigStack = makeWASocket({
             version,
