@@ -60,7 +60,7 @@ const aliveCommand = async (sock, chatId, msg) => {
         const formattedRam = `${ramBar}  ${Math.round(ramPercent)}% (${usedRam.toFixed(2)}GB / ${totalRam.toFixed(1)}GB)`;
 
         // Hardcoded hostname
-        const hostname = 'bighost';
+        const hostname = 'BIGHOST';
         const platform = os.platform();
         const nodeVersion = process.version;
         const cpuModel = os.cpus()[0]?.model.trim() || 'Generic CPU';
@@ -75,18 +75,18 @@ const aliveCommand = async (sock, chatId, msg) => {
 🖥️  *BigStack ENGINE STATUS*
 Hey, I'm alive! 🟢
 
-└── ▢ DATE      : ${dateStr}
-└── ▢ TIME      : ${timeStr} EAT
-└── ▢ UPTIME    : ${formatUptime(process.uptime())}
-└── ▢ HOSTNAME  : ${hostname}
-└── ▢ PLATFORM  : ${platform} 💻
-└── ▢ RAM       : ${formattedRam}
-└── ▢ NODE      : ${nodeVersion}
-└── ▢ LIBRARY   : ${library}
-└── ▢ COMMANDS  : ${totalCommands}
-└── ▢ PREFIX    : ${prefix}
-└── ▢ LATENCY   : ${latency}ms
-└── ▢ CPU       : ${cpuModel}  [OK]
+└ ▢ DATE      : ${dateStr}
+└ ▢ TIME      : ${timeStr} EAT
+└ ▢ UPTIME    : ${formatUptime(process.uptime())}
+└ ▢ HOSTNAME  : ${hostname}
+└ ▢ PLATFORM  : ${platform} 💻
+└ ▢ RAM       : ${formattedRam}
+└ ▢ NODE      : ${nodeVersion}
+└ ▢ LIBRARY   : ${library}
+└ ▢ COMMANDS  : ${totalCommands}
+└ ▢ PREFIX    : ${prefix}
+└ ▢ LATENCY   : ${latency}ms
+└ ▢ CPU       : ${cpuModel}  [OK]
 
 © bigmanj tech ™ with ♥︎`.trim();
 
@@ -96,9 +96,9 @@ Hey, I'm alive! 🟢
             text: statusMessage,
             footer: 'Powered by bigmanj tech',
             buttons: [
-                { id: '.menu', text: '🆘 Menu' },
+                { id: '.menu', text: '©️ Menu' },
                 { id: '.ping', text: '📡 Speed' },
-                { id: '.owner', text: '👑 Support' }
+                { id: '.owner', text: '®️ Support' }
             ]
         }, { quoted: msg });
 
