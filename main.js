@@ -140,7 +140,6 @@ const sudoCommand = require('./commands/sudo');
 
 const stickercropCommand = require('./commands/stickercrop');
 const mickeyCommand = require('./commands/Mickey');
-// ✅ FIXED: Destructure updateCommand from the exported object
 const { updateCommand } = require('./commands/update');
 const checkUpdatesCommand = require('./commands/checkupdates');
 const { igsCommand } = require('./commands/igs');
@@ -239,6 +238,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
                         text: `🔗 *Support Group*\n\nJoin our support community:\nhttps://chat.whatsapp.com/GA4WrOFythU6g3BFVubYM7?mode=wwt`
                     }, { quoted: message });
                 },
+                // ✅ TEAM SUPPORT
                 'team_support': async () => {
                     try {
                         const menuModule = require('./commands/menu');
@@ -256,6 +256,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
                         }, { quoted: message });
                     }
                 },
+                // ✅ BUY BOT
                 'buy_bot': async () => {
                     try {
                         const menuModule = require('./commands/menu');
@@ -270,6 +271,41 @@ async function handleMessages(sock, messageUpdate, printLog) {
                         console.error('Buy bot handler error:', e);
                         await sock.sendMessage(chatId, {
                             text: `💎 *Buy Bot Script*\n\nContact owner: wa.me/255719632816`
+                        }, { quoted: message });
+                    }
+                },
+                // ✅ NEW: buynow and contactowner from buy.js
+                'buynow': async () => {
+                    try {
+                        const { buttonHandlers } = require('./commands/buy');
+                        if (buttonHandlers && buttonHandlers.buynow) {
+                            await buttonHandlers.buynow(sock, chatId, message);
+                        } else {
+                            await sock.sendMessage(chatId, {
+                                text: `💰 *Buy Now*\n\nSend payment to:\nM-PESA: 255636657591\nName: Irene Laitoni\nNetwork: Halotel\n\nAfter payment, send screenshot to wa.me/255636657591`
+                            }, { quoted: message });
+                        }
+                    } catch (e) {
+                        console.error('Buynow handler error:', e);
+                        await sock.sendMessage(chatId, {
+                            text: `💰 *Buy Now*\n\nContact owner: wa.me/255636657591`
+                        }, { quoted: message });
+                    }
+                },
+                'contactowner': async () => {
+                    try {
+                        const { buttonHandlers } = require('./commands/buy');
+                        if (buttonHandlers && buttonHandlers.contactowner) {
+                            await buttonHandlers.contactowner(sock, chatId, message);
+                        } else {
+                            await sock.sendMessage(chatId, {
+                                text: `📲 *Contact Owner*\n\nName: Irene Laitoni\nNumber: 255636657591\nNetwork: Halotel\n\nClick: https://wa.me/255636657591`
+                            }, { quoted: message });
+                        }
+                    } catch (e) {
+                        console.error('Contactowner handler error:', e);
+                        await sock.sendMessage(chatId, {
+                            text: `📲 *Contact Owner*\n\nwa.me/255636657591`
                         }, { quoted: message });
                     }
                 }
@@ -350,6 +386,22 @@ async function handleMessages(sock, messageUpdate, printLog) {
                             const menuModule = require('./commands/menu');
                             if (menuModule.buttonHandlers && menuModule.buttonHandlers.buy_bot) {
                                 await menuModule.buttonHandlers.buy_bot(sock, chatId, message);
+                            }
+                        } catch (e) {}
+                    },
+                    'buynow': async () => {
+                        try {
+                            const { buttonHandlers } = require('./commands/buy');
+                            if (buttonHandlers && buttonHandlers.buynow) {
+                                await buttonHandlers.buynow(sock, chatId, message);
+                            }
+                        } catch (e) {}
+                    },
+                    'contactowner': async () => {
+                        try {
+                            const { buttonHandlers } = require('./commands/buy');
+                            if (buttonHandlers && buttonHandlers.contactowner) {
+                                await buttonHandlers.contactowner(sock, chatId, message);
                             }
                         } catch (e) {}
                     }
