@@ -8,11 +8,11 @@ async function handleAntilinkCommand(sock, chatId, userMessage, senderId, isSend
     try {
         if (!isSenderAdmin) {
             const msg = 
-`└── ▢ ❌ *PERMISSION DENIED*
+`└ ▢ ❌ *PERMISSION DENIED*
 
-└─ ▢ ─ *REQUIREMENT* ─
-└─ ▢ Be an admin first 🥇
-└─ ▢ Then antilink security will run perfectly
+└ ▢ ─ *REQUIREMENT* ─
+└ ▢ Be an admin first 🥇
+└ ▢ Then antilink security will run perfectly
 
 📌 Only admins can configure antilink.
 
@@ -27,14 +27,14 @@ ${FOOTER}`;
 
         if (!action) {
             const usage = 
-`└── ▢ 🔗 *ANTILINK SETUP*
+`└ ▢ 🔗 *ANTILINK SETUP*
 
-└─ ▢ ─ *COMMANDS* ─
-└─ ▢ .antilink on         - Enable antilink (delete mode)
-└─ ▢ .antilink off        - Disable antilink
-└─ ▢ .antilink set delete - Quiet delete mode
-└─ ▢ .antilink set warn   - Delete + progressive warnings
-└─ ▢ .antilink set remove - Delete + immediate kick
+└ ▢ ─ *COMMANDS* ─
+└ ▢ .antilink on         - Enable antilink (delete mode)
+└ ▢ .antilink off        - Disable antilink
+└ ▢ .antilink set delete - Quiet delete mode
+└ ▢ .antilink set warn   - Delete + progressive warnings
+└ ▢ .antilink set remove - Delete + immediate kick
 
 ${FOOTER}`;
             await sock.sendMessage(chatId, { text: usage }, { quoted: message });
@@ -46,9 +46,9 @@ ${FOOTER}`;
                 const existingConfig = await getAntilink(chatId, 'on');
                 if (existingConfig?.enabled) {
                     const msg = 
-`└─ ▢ ℹ️ *ALREADY ON*
+`└ ▢ ℹ️ *ALREADY ON*
 
-└─ ▢ Antilink is already ON 💀
+└ ▢ Antilink is already ON 💀
 
 ${FOOTER}`;
                     await sock.sendMessage(chatId, { text: msg }, { quoted: message });
@@ -56,11 +56,11 @@ ${FOOTER}`;
                 }
                 const result = await setAntilink(chatId, 'on', 'delete');
                 const msg = result 
-                    ? `└── ▢ 🔒 *ANTILINK ACTIVATED*
+                    ? `└ ▢ 🔒 *ANTILINK ACTIVATED*
 
-└─ ▢ ─ *STATUS* ─
-└─ ▢ Status : 🟢 ON
-└─ ▢ Action : Delete (quiet mode)
+└ ▢ ─ *STATUS* ─
+└ ▢ Status : 🟢 ON
+└ ▢ Action : Delete (quiet mode)
 
 📌 NO LINKS ALLOWED HERE 💀
 
@@ -73,11 +73,11 @@ ${FOOTER}`
             case 'off': {
                 await removeAntilink(chatId, 'on');
                 const msg = 
-`└─ ▢ 🔓 *ANTILINK DEACTIVATED*
+`└ ▢ 🔓 *ANTILINK DEACTIVATED*
 
-└─ ▢ ─ *STATUS* ─
-└─ ▢ Status : 🔴 OFF
-└─ ▢ Links : ✅ ALLOWED
+└ ▢ ─ *STATUS* ─
+└ ▢ Status : 🔴 OFF
+└ ▢ Links : ✅ ALLOWED
 
 📌 Antilink has been turned OFF.
 
@@ -89,9 +89,9 @@ ${FOOTER}`;
             case 'set': {
                 if (args.length < 2) {
                     const msg = 
-`└─ ▢ ❌ *INVALID ACTION*
+`└ ▢ ❌ *INVALID ACTION*
 
-└─ ▢ Usage : .antilink set delete | warn | remove
+└ ▢ Usage : .antilink set delete | warn | remove
 
 ${FOOTER}`;
                     await sock.sendMessage(chatId, { text: msg }, { quoted: message });
@@ -100,9 +100,9 @@ ${FOOTER}`;
                 const setAction = args[1];
                 if (!['delete', 'warn', 'remove'].includes(setAction)) {
                     const msg = 
-`└─ ▢ ❌ *INVALID OPTION*
+`└ ▢ ❌ *INVALID OPTION*
 
-└─ ▢ Choose: delete, warn, or remove.
+└ ▢ Choose: delete, warn, or remove.
 
 ${FOOTER}`;
                     await sock.sendMessage(chatId, { text: msg }, { quoted: message });
@@ -112,15 +112,15 @@ ${FOOTER}`;
                 const actionEmoji = setAction === 'delete' ? '🔇' : setAction === 'warn' ? '⚠️' : '🚫';
                 const actionDesc = setAction === 'delete' ? 'Quiet delete' : setAction === 'warn' ? 'Delete + warnings' : 'Delete + immediate kick';
                 const msg = setResult 
-                    ? `└── ▢ ✅ *ANTILINK UPDATED*
+                    ? `└ ▢ ✅ *ANTILINK UPDATED*
 
-└─ ▢ ─ *CONFIGURATION* ─
-└─ ▢ Action : ${actionEmoji} ${actionDesc}
+└ ▢ ─ *CONFIGURATION* ─
+└ ▢ Action : ${actionEmoji} ${actionDesc}
 
 📌 Antilink action set to ${setAction}.
 
 ${FOOTER}`
-                    : `└── ▢ ❌ *FAILED*\n\n└── ▢ Failed to set Antilink action\n\n${FOOTER}`;
+                    : `└ ▢ ❌ *FAILED*\n\n└ ▢ Failed to set Antilink action\n\n${FOOTER}`;
                 await sock.sendMessage(chatId, { text: msg }, { quoted: message });
                 break;
             }
@@ -133,9 +133,9 @@ ${FOOTER}`
                 const msg = 
 `└─ ▢ 📊 *ANTILINK CONFIGURATION*
 
-└─ ▢ ─ *SETTINGS* ─
-└─ ▢ Status : ${statusEmoji}
-└─ ▢ Action : ${actionDisplay}
+└ ▢ ─ *SETTINGS* ─
+└ ▢ Status : ${statusEmoji}
+└ ▢ Action : ${actionDisplay}
 
 ${FOOTER}`;
                 await sock.sendMessage(chatId, { text: msg }, { quoted: message });
@@ -144,9 +144,9 @@ ${FOOTER}`;
 
             default: {
                 const msg = 
-`└─ ▢ ❌ *UNKNOWN COMMAND*
+`└ ▢ ❌ *UNKNOWN COMMAND*
 
-└─ ▢ Use .antilink for usage help.
+└ ▢ Use .antilink for usage help.
 
 ${FOOTER}`;
                 await sock.sendMessage(chatId, { text: msg }, { quoted: message });
@@ -155,9 +155,9 @@ ${FOOTER}`;
     } catch (error) {
         console.error('Error in antilink command:', error);
         const msg = 
-`└─ ▢ ❌ *ERROR*
+`└ ▢ ❌ *ERROR*
 
-└─ ▢ Error processing antilink command.
+└ ▢ Error processing antilink command.
 
 ${FOOTER}`;
         await sock.sendMessage(chatId, { text: msg }, { quoted: message });
@@ -194,10 +194,10 @@ async function handleLinkDetection(sock, chatId, message, userMessage, senderId)
             const kickMsg = 
 `└─ ▢ 💀 *YOU HAVE BEEN REMOVED*
 
-└─ ▢ ─ *ACTION* ─
-└─ ▢ User    : @${mention}
-└─ ▢ Reason  : ${WARN_COUNT} warnings ignored
-└─ ▢ Status  : 🚫 EXPELLED
+└ ▢ ─ *ACTION* ─
+└ ▢ User    : @${mention}
+└ ▢ Reason  : ${WARN_COUNT} warnings ignored
+└ ▢ Status  : 🚫 EXPELLED
 
 📌 BigStack Antilink does not tolerate rule breaking.
 
@@ -208,20 +208,20 @@ ${FOOTER}`;
                 await sock.groupParticipantsUpdate(chatId, [senderId], 'remove');
             } catch (err) {
                 const adminMsg = 
-`└─ ▢ ❌ *ADMIN REQUIRED*
-└─ ▢ Please make the bot an admin to kick users.
+`└ ▢ ❌ *ADMIN REQUIRED*
+└ ▢ Please make the bot an admin to kick users.
 
 ${FOOTER}`;
                 await sock.sendMessage(chatId, { text: adminMsg });
             }
         } else {
             const warnMsg = 
-`└─ ▢ 🚫 *ANTILINK WARNING ${warningCount}/${WARN_COUNT}*
+`└ ▢ 🚫 *ANTILINK WARNING ${warningCount}/${WARN_COUNT}*
 
-└─ ▢ ─*VIOLATION* ─
-└─ ▢ User    : @${mention}
-└─ ▢ Action  : Posted forbidden link
-└─ ▢ Warning : ${warningCount}/${WARN_COUNT}
+└ ▢ ─*VIOLATION* ─
+└ ▢ User    : @${mention}
+└ ▢ Action  : Posted forbidden link
+└ ▢ Warning : ${warningCount}/${WARN_COUNT}
 
 📌 Next violation will get you REMOVED.
 🔪 BigStack Security System – ACTIVE
@@ -231,12 +231,12 @@ ${FOOTER}`;
         }
     } else if (action === 'remove') {
         const kickMsg = 
-`└── ▢ 💀 *YOU HAVE BEEN REMOVED*
+`└ ▢ 💀 *YOU HAVE BEEN REMOVED*
 
-└─ ▢ ─ *ACTION* ─
-└─ ▢ User    : @${mention}
-└─ ▢ Reason  : Posted forbidden link
-└─ ▢ Status  : 🚫 EXPELLED
+└ ▢ ─ *ACTION* ─
+└ ▢ User    : @${mention}
+└ ▢ Reason  : Posted forbidden link
+└ ▢ Status  : 🚫 EXPELLED
 
 📌 BigStack Antilink does not tolerate rule breaking.
 
@@ -248,9 +248,9 @@ ${FOOTER}`;
             await resetWarningCount(chatId, senderId);
         } catch (err) {
             const adminMsg = 
-`└─ ▢ ❌ *ADMIN REQUIRED*
+`└ ▢ ❌ *ADMIN REQUIRED*
 
-└─ ▢ Please make the bot an admin to kick users.
+└ ▢ Please make the bot an admin to kick users.
 
 ${FOOTER}`;
             await sock.sendMessage(chatId, { text: adminMsg });
