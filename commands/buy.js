@@ -4,12 +4,13 @@ const FOOTER = '© bigmanj tech ™ with ♥︎';
 
 // Maelezo ya mpokeaji wa malipo (Irene Laitoni - Halotel)
 const PAYMENT_NAME = 'Irene Laitoni';
-const PAYMENT_NUMBER = '0636657591'; // 0636657591
+const PAYMENT_NUMBER = '0636657591';
 const PAYMENT_NETWORK = 'Halotel';
 
 // Namba yako (owner) kwa mawasiliano
 const OWNER_NUMBER = '255636756591';
 
+// ─── COMMAND: .buy ─────────────────────────────────────────────
 async function buyCommand(sock, chatId, message) {
     try {
         const productImage = 'https://x.xcute.workers.dev/f/images/abe592862f20.jpg';
@@ -18,8 +19,8 @@ async function buyCommand(sock, chatId, message) {
 `└─ ▢ 💎 *BUY BOT SCRIPT*
 
 └─ ▢ ─*PRODUCT* ─
-└─ ▢ Name    : BigSTack
-└─ ▢ Brand   : By biganj tech
+└─ ▢ Name    : BigStack
+└─ ▢ Brand   : By bigmanj tech
 └─ ▢ Price   : Tsh 45.000
 └─ ▢ Sale    : Tsh 35.000 🎉
 
@@ -55,16 +56,16 @@ ${FOOTER}`;
     }
 }
 
-// ========== BUTTON HANDLERS ==========
-async function handleBuyNow(sock, chatId, message) {
+// ─── COMMAND: .buynow ──────────────────────────────────────────
+async function buyNowCommand(sock, chatId, message) {
     const senderName = message.pushName || 'Customer';
     const senderNumber = (message.key.participant || message.key.remoteJid).split('@')[0];
 
     const msg = 
-`└ ▢ 💰 *PURCHASE REQUEST*
+`└─ ▢ 💰 *PURCHASE REQUEST*
 
 └─ ▢ ─ *INSTRUCTIONS* ─
-└─ ▢ To purchase *~BigStack~* script:
+└─ ▢ To purchase *BigStack* script:
 
 📌 *Send payment of Tsh 35,000 to:*
 └─ ▢ HALOTEL: ${PAYMENT_NUMBER}
@@ -72,7 +73,7 @@ async function handleBuyNow(sock, chatId, message) {
 └─ ▢ Network: ${PAYMENT_NETWORK}
 
 📌 After payment, send screenshot to:
-└─ ▢ [Click Here] 255636756591
+└─ ▢ [Click Here](https://wa.me/${OWNER_NUMBER})
 
 📌 You will receive the script within 10 minutes.
 
@@ -84,11 +85,11 @@ ${FOOTER}`;
     await sock.sendMessage(chatId, { text: msg }, { quoted: message });
 }
 
-async function handleContactOwner(sock, chatId, message) {
+// ─── COMMAND: .contactowner ────────────────────────────────────
+async function contactOwnerCommand(sock, chatId, message) {
     const senderName = message.pushName || 'Customer';
     const senderNumber = (message.key.participant || message.key.remoteJid).split('@')[0];
 
-    // Ujumbe wa maelezo ya bot
     const botInfo = 
 `└─ ▢ 🤖 *BIGSTACK BOT INFO*
 
@@ -116,8 +117,22 @@ ${FOOTER}`;
     await sock.sendMessage(chatId, { text: botInfo }, { quoted: message });
 }
 
-module.exports = buyCommand;
-module.exports.buttonHandlers = {
-    'buynow': handleBuyNow,
-    'contactowner': handleContactOwner
+// ─── BUTTON HANDLERS (zinaita commands) ──────────────────────
+async function handleBuyNow(sock, chatId, message) {
+    await buyNowCommand(sock, chatId, message);
+}
+
+async function handleContactOwner(sock, chatId, message) {
+    await contactOwnerCommand(sock, chatId, message);
+}
+
+// ─── EXPORTS ──────────────────────────────────────────────────
+module.exports = {
+    buyCommand,
+    buyNowCommand,
+    contactOwnerCommand,
+    buttonHandlers: {
+        'buynow': handleBuyNow,
+        'contactowner': handleContactOwner
+    }
 };
